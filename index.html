@@ -6,12 +6,19 @@
     <title>0xGhost Security Dashboard</title>
     <style>
         :root { --bg: #0d1117; --card: #161b22; --accent: #00ff88; --text: #c9d1d9; --border: #30363d; }
-        body { background: var(--bg); color: var(--text); font-family: monospace; margin: 0; padding: 20px; }
-        .container { max-width: 1000px; margin: 0 auto; }
-        h1 { color: var(--accent); text-align: center; }
-        .card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 20px; margin-bottom: 20px; }
-        button { background: var(--accent); color: #000; font-weight: bold; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
-        pre { background: #000; padding: 15px; border-radius: 4px; border: 1px solid var(--border); color: #00ff88; overflow-x: auto; }
+        body { background: var(--bg); color: var(--text); font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin: 0; padding: 20px; }
+        .container { max-width: 1100px; margin: 0 auto; }
+        h1 { color: var(--accent); text-align: center; margin-bottom: 10px; }
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        button { background: var(--accent); color: #000; font-weight: bold; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
+        input[type="text"], input[type="password"] { width: 60%; padding: 10px; border-radius: 6px; border: 1px solid var(--border); background: #0b0f13; color: var(--text); }
+        .small { font-size: 0.9rem; color: #9aa3ad; }
+        pre { background: #000; padding: 15px; border-radius: 6px; border: 1px solid var(--border); color: #00ff88; overflow-x: auto; }
+        .row { display:flex; gap: 12px; align-items:center; margin-bottom: 12px; }
+        .section-title { color: #9be6b4; margin-top: 8px; margin-bottom: 6px; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        th, td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); text-align: left; font-family: monospace; }
+        .muted { color: #7a869a; font-size: 0.9rem }
     </style>
 </head>
 <body>
@@ -19,42 +26,126 @@
         <h1>0xGhost Security Suite</h1>
 
         <div class="card">
-            <h3>How to Start a New Scan:</h3>
-            <p>1. Open the <strong>Actions</strong> tab in your GitHub Repository.</p>
-            <p>2. Click <strong>0xGhost Automated Scanner Pipeline</strong>.</p>
-            <p>3. Click <strong>Run workflow</strong>, enter your target, and run it.</p>
-            <p>4. Once finished, click the button below to load the scan report.</p>
-            <button onclick="fetchResults()">Fetch Latest Results</button>
+            <h3>Start a New Scan</h3>
+            <div class="row">
+                <input type="text" id="targetInput" placeholder="e.g. example.com or 1.2.3.4" />
+                <button id="startBtn" onclick="startScan()">Start Scan</button>
+            </div>
+            <div class="row">
+                <input type="password" id="tokenInput" placeholder="(optional) GitHub Personal Access Token to start Actions" />
+                <button onclick="openActionsRun()">Open Actions Run Page</button>
+            </div>
+            <div class="small">If you provide a GitHub token (repo:workflow scope), this page will request the workflow to run on your behalf and then fetch results when ready. If no token is provided, click "Open Actions Run Page" to manually run the workflow from GitHub UI.</div>
+            <div id="jobInfo" class="small" style="margin-top:10px;"></div>
         </div>
 
         <div class="card" id="reportCard" style="display:none;">
-            <h2>Master Scan Report</h2>
-            <div id="output"></div>
+            <h2>Scan Report</h2>
+            <div id="summary"></div>
+            <div id="details"></div>
         </div>
     </div>
 
     <script>
-        async function fetchResults() {
-            const out = document.getElementById('output');
-            document.getElementById('reportCard').style.display = 'block';
-            out.innerHTML = 'Fetching results...';
+        const owner = 'omieee-11';
+        const repo = '0xGhost';
+        const workflowFile = 'run_scan.yml';
+        const branch = 'main';
+
+        function openActionsRun() {
+            // Open the GitHub UI to manually run the workflow
+            window.open(`https://github.com/${owner}/${repo}/actions/workflows/${workflowFile}`);
+        }
+
+        async function startScan() {
+            const target = document.getElementById('targetInput').value.trim();
+            const token = document.getElementById('tokenInput').value.trim();
+            if (!target) { alert('Please enter a target.'); return; }
+            document.getElementById('jobInfo').innerText = 'Starting scan...';
+            document.getElementById('reportCard').style.display = 'none';
+
+            if (!token) {
+                document.getElementById('jobInfo').innerText = 'No token provided — open Actions page to run manually.';
+                openActionsRun();
+                return;
+            }
 
             try {
-                const res = await fetch('./results.json?cb=' + new Date().getTime());
-                if (!res.ok) {
-                    out.innerHTML = '<p style="color: #ff5555;">No scan results found yet. Run a workflow first!</p>';
-                    return;
+                // Dispatch workflow
+                const url = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowFile}/dispatches`;
+                const body = { ref: branch, inputs: { target } };
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/vnd.github+json',
+                        'Authorization': 'token ' + token
+                    },
+                    body: JSON.stringify(body)
+                });
+
+                if (res.status === 204) {
+                    document.getElementById('jobInfo').innerText = 'Workflow dispatched. Waiting for results (this may take several minutes)...';
+                    pollForResults(target);
+                } else {
+                    const text = await res.text();
+                    document.getElementById('jobInfo').innerText = `Failed to dispatch workflow: ${res.status} ${text}`;
                 }
-                const data = await res.json();
-                out.innerHTML = `
-                    <p><strong>Target:</strong> ${data.target || 'N/A'}</p>
-                    <pre>${JSON.stringify(data, null, 2)}</pre>
-                `;
             } catch (e) {
-                out.innerHTML = '<p style="color: #ff5555;">Error loading results.json file.</p>';
+                document.getElementById('jobInfo').innerText = 'Error dispatching workflow. See console.';
+                console.error(e);
             }
         }
-        window.onload = fetchResults;
+
+        async function pollForResults(target) {
+            const rawUrlBase = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/results.json`;
+            const maxAttempts = 240; // ~20 minutes if interval=5s
+            const interval = 5000;
+            let attempts = 0;
+
+            document.getElementById('jobInfo').innerText = 'Polling for results.json in repository...';
+
+            const iv = setInterval(async () => {
+                attempts++;
+                try {
+                    const res = await fetch(rawUrlBase + '?cb=' + Date.now());
+                    if (res.ok) {
+                        const data = await res.json();
+                        clearInterval(iv);
+                        renderReport(data);
+                        document.getElementById('jobInfo').innerText = 'Scan completed and results loaded.';
+                        return;
+                    }
+                } catch (e) {
+                    // ignore parse errors until file is published
+                }
+
+                if (attempts >= maxAttempts) {
+                    clearInterval(iv);
+                    document.getElementById('jobInfo').innerText = 'Timed out waiting for results.json. Check Actions or run workflow manually.';
+                } else {
+                    document.getElementById('jobInfo').innerText = `Waiting for results... (attempt ${attempts})`;
+                }
+            }, interval);
+        }
+
+        function renderReport(report) {
+            document.getElementById('reportCard').style.display = 'block';
+            const summaryDiv = document.getElementById('summary');
+            const detailsDiv = document.getElementById('details');
+            summaryDiv.innerHTML = `<p><strong>Target:</strong> ${report.target || 'N/A'}</p>
+                                    <p><strong>Collected at:</strong> ${report.collected_at || report.finished_at || 'N/A'}</p>`;
+
+            const scans = report.scans || {};
+            let summaryTable = '<div class="section-title">Scans Overview</div><table><thead><tr><th>Phase</th><th>Note</th></tr></thead><tbody>';
+            for (const [phase, data] of Object.entries(scans)) {
+                const note = (data && data.total_subdomains) ? `subdomains=${data.total_subdomains}` : (data && data.results ? `items=${data.results.length}` : '—');
+                summaryTable += `<tr><td>${phase}</td><td>${note}</td></tr>`;
+            }
+            summaryTable += '</tbody></table>';
+
+            detailsDiv.innerHTML = `<div class="section-title">Detailed JSON</div><pre>${JSON.stringify(report, null, 2)}</pre>`;
+            summaryDiv.innerHTML += summaryTable;
+        }
     </script>
 </body>
 </html>
