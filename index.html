@@ -55,6 +55,7 @@
             z-index: 0;
             opacity: 0.18;
             pointer-events: none;
+            transition: opacity 0.3s ease;
         }
 
         /* Scanline CRT overlay effect */
@@ -70,6 +71,7 @@
             );
             background-size: 100% 4px, 6px 100%;
             pointer-events: none;
+            transition: opacity 0.3s ease;
         }
 
         /* Custom glow styles */
@@ -113,6 +115,21 @@
         .animate-cursor {
             animation: cursorBlink 1s infinite;
         }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background: #ffffff !important;
+                color: #000000 !important;
+            }
+            .bg-cyber-card, .bg-cyber-panel, .bg-cyber-black {
+                background: #ffffff !important;
+                border-color: #cbd5e1 !important;
+                color: #0f172a !important;
+            }
+        }
     </style>
 </head>
 <body class="bg-cyber-black text-slate-300 font-mono min-h-screen relative overflow-x-hidden selection:bg-cyan-500 selection:text-black">
@@ -121,13 +138,13 @@
     <canvas id="matrixCanvas"></canvas>
 
     <!-- CRT Scanline Screen Overlay -->
-    <div class="fixed inset-0 scanline-overlay z-10"></div>
+    <div id="crtOverlay" class="fixed inset-0 scanline-overlay z-10"></div>
 
     <!-- Main App Container -->
     <div class="relative z-20 flex flex-col min-h-screen">
         
         <!-- Top Navigation Header -->
-        <header class="border-b border-cyber-border/80 bg-cyber-black/80 backdrop-blur px-4 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-4 sticky top-0">
+        <header class="border-b border-cyber-border/80 bg-cyber-black/80 backdrop-blur px-4 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-30">
             <div class="flex items-center space-x-3">
                 <div class="w-10 h-10 rounded border border-cyber-cyan/50 bg-cyber-cyan/10 flex items-center justify-center text-cyber-cyan glow-cyan">
                     <i class="fa-solid fa-radar text-xl animate-pulse"></i>
@@ -136,12 +153,12 @@
                     <h1 class="text-xl font-bold text-white tracking-widest text-glow-cyan flex items-center gap-2">
                         SPECTRE<span class="text-cyber-cyan">//</span>OSINT
                     </h1>
-                    <p class="text-[10px] text-slate-400 tracking-wider uppercase">Automated Intelligence & Reconnaissance Framework</p>
+                    <p class="text-[10px] text-slate-400 tracking-wider uppercase">Automated Intelligence & Vulnerability Assessment</p>
                 </div>
             </div>
 
-            <!-- HUD System Metrics & Control -->
-            <div class="flex items-center space-x-6 text-xs">
+            <!-- Visual FX & HUD Controls -->
+            <div class="flex items-center space-x-4 text-xs">
                 <div class="hidden sm:flex items-center space-x-4 border-r border-slate-800 pr-6">
                     <div>
                         <span class="text-slate-500 block text-[10px]">SYSTEM STATUS</span>
@@ -151,17 +168,37 @@
                     </div>
                     <div>
                         <span class="text-slate-500 block text-[10px]">ENGINE VERSION</span>
-                        <span class="text-slate-300">v3.4.0-NIGHTLY</span>
-                    </div>
-                    <div>
-                        <span class="text-slate-500 block text-[10px]">NODE IP</span>
-                        <span class="text-cyber-cyan font-mono">127.0.0.1</span>
+                        <span class="text-slate-300">v3.5.2-RELEASE</span>
                     </div>
                 </div>
 
-                <button onclick="exportFullReport()" class="px-3.5 py-1.5 rounded border border-cyber-cyan/40 bg-cyber-cyan/10 hover:bg-cyber-cyan/20 text-cyber-cyan text-xs font-semibold flex items-center gap-2 transition glow-cyan">
-                    <i class="fa-solid fa-file-arrow-down"></i> EXPORT REPORT
-                </button>
+                <!-- Display FX Toggles -->
+                <div class="flex items-center gap-2 border-r border-slate-800 pr-4">
+                    <button onclick="toggleCRT()" id="crtToggleBtn" title="Toggle Scanline FX" class="p-2 rounded border border-cyber-cyan/40 bg-cyber-cyan/10 text-cyber-cyan hover:bg-cyber-cyan/20 transition">
+                        <i class="fa-solid fa-tv"></i> <span class="hidden md:inline text-[11px] ml-1">CRT</span>
+                    </button>
+                    <button onclick="toggleMatrix()" id="matrixToggleBtn" title="Toggle Matrix Rain FX" class="p-2 rounded border border-cyber-cyan/40 bg-cyber-cyan/10 text-cyber-cyan hover:bg-cyber-cyan/20 transition">
+                        <i class="fa-solid fa-code"></i> <span class="hidden md:inline text-[11px] ml-1">MATRIX</span>
+                    </button>
+                </div>
+
+                <!-- Export Options Dropdown -->
+                <div class="relative group no-print">
+                    <button class="px-3.5 py-2 rounded border border-cyber-cyan/40 bg-cyber-cyan/10 hover:bg-cyber-cyan/20 text-cyber-cyan text-xs font-semibold flex items-center gap-2 transition glow-cyan">
+                        <i class="fa-solid fa-download"></i> EXPORT <i class="fa-solid fa-chevron-down text-[10px]"></i>
+                    </button>
+                    <div class="absolute right-0 mt-1 w-44 bg-cyber-card border border-cyber-border rounded shadow-xl hidden group-hover:block z-50">
+                        <button onclick="exportJSON()" class="w-full text-left px-4 py-2 hover:bg-cyber-cyan/10 text-xs text-slate-300 hover:text-cyber-cyan flex items-center gap-2">
+                            <i class="fa-solid fa-file-code"></i> Export JSON
+                        </button>
+                        <button onclick="exportCSV()" class="w-full text-left px-4 py-2 hover:bg-cyber-cyan/10 text-xs text-slate-300 hover:text-cyber-cyan flex items-center gap-2">
+                            <i class="fa-solid fa-file-csv"></i> Export Subdomains (CSV)
+                        </button>
+                        <button onclick="exportFullReport()" class="w-full text-left px-4 py-2 hover:bg-cyber-cyan/10 text-xs text-slate-300 hover:text-cyber-cyan flex items-center gap-2">
+                            <i class="fa-solid fa-print"></i> Print / Save PDF
+                        </button>
+                    </div>
+                </div>
             </div>
         </header>
 
@@ -169,7 +206,7 @@
         <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
 
             <!-- Target Input Section -->
-            <section class="bg-cyber-card rounded-lg border border-cyber-border/80 p-4 md:p-6 glow-cyan">
+            <section class="bg-cyber-card rounded-lg border border-cyber-border/80 p-4 md:p-6 glow-cyan no-print">
                 <form id="reconForm" onsubmit="executeReconScan(event)" class="space-y-4">
                     <div class="flex flex-col md:flex-row gap-3">
                         <div class="relative flex-1">
@@ -180,6 +217,7 @@
                                 type="text" 
                                 id="targetDomain" 
                                 required 
+                                value="target-corp.com"
                                 placeholder="example-startup.com or 192.168.1.1" 
                                 class="w-full pl-24 pr-4 py-3 bg-cyber-black/90 border border-cyber-border focus:border-cyber-cyan rounded text-slate-100 font-mono text-sm placeholder-slate-600 focus:outline-none transition glow-cyan"
                             />
@@ -196,30 +234,30 @@
                     <!-- Target Scope Selector Modules -->
                     <div class="pt-2 border-t border-cyber-border/50">
                         <span class="text-[11px] text-slate-400 font-semibold tracking-wider block mb-2">ACTIVE RECONNAISSANCE MODULES</span>
-                        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 text-xs">
+                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs">
                             <label class="flex items-center gap-2 p-2 rounded bg-cyber-black/60 border border-cyber-border cursor-pointer hover:border-cyber-cyan/50 transition">
                                 <input type="checkbox" id="modDNS" checked class="accent-cyber-cyan">
-                                <span class="text-slate-300">DNS Enumeration</span>
-                            </label>
-                            <label class="flex items-center gap-2 p-2 rounded bg-cyber-black/60 border border-cyber-border cursor-pointer hover:border-cyber-cyan/50 transition">
-                                <input type="checkbox" id="modWhois" checked class="accent-cyber-cyan">
-                                <span class="text-slate-300">WHOIS Lookup</span>
+                                <span class="text-slate-300">DNS & WHOIS</span>
                             </label>
                             <label class="flex items-center gap-2 p-2 rounded bg-cyber-black/60 border border-cyber-border cursor-pointer hover:border-cyber-cyan/50 transition">
                                 <input type="checkbox" id="modSubs" checked class="accent-cyber-cyan">
-                                <span class="text-slate-300">Subdomain Mapping</span>
+                                <span class="text-slate-300">Subdomains</span>
                             </label>
                             <label class="flex items-center gap-2 p-2 rounded bg-cyber-black/60 border border-cyber-border cursor-pointer hover:border-cyber-cyan/50 transition">
                                 <input type="checkbox" id="modHeaders" checked class="accent-cyber-cyan">
-                                <span class="text-slate-300">HTTP Security Headers</span>
-                            </label>
-                            <label class="flex items-center gap-2 p-2 rounded bg-cyber-black/60 border border-cyber-border cursor-pointer hover:border-cyber-cyan/50 transition">
-                                <input type="checkbox" id="modSSL" checked class="accent-cyber-cyan">
-                                <span class="text-slate-300">SSL/TLS Inspection</span>
+                                <span class="text-slate-300">HTTP Headers</span>
                             </label>
                             <label class="flex items-center gap-2 p-2 rounded bg-cyber-black/60 border border-cyber-border cursor-pointer hover:border-cyber-cyan/50 transition">
                                 <input type="checkbox" id="modPorts" checked class="accent-cyber-cyan">
                                 <span class="text-slate-300">Port Discovery</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-2 rounded bg-cyber-black/60 border border-cyber-border cursor-pointer hover:border-cyber-cyan/50 transition">
+                                <input type="checkbox" id="modRisk" checked class="accent-cyber-cyan">
+                                <span class="text-slate-300">Risk Scoring</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-2 rounded bg-cyber-black/60 border border-cyber-border cursor-pointer hover:border-cyber-cyan/50 transition">
+                                <input type="checkbox" id="modRemediation" checked class="accent-cyber-cyan">
+                                <span class="text-slate-300">Hardening Plan</span>
                             </label>
                         </div>
                     </div>
@@ -235,9 +273,12 @@
                         <span class="w-3 h-3 rounded-full bg-cyber-green/80 inline-block"></span>
                         <span class="text-xs text-slate-400 font-bold ml-2">TTY_01 // RECON_TERMINAL_LOGS</span>
                     </div>
-                    <div class="flex items-center space-x-3">
+                    <div class="flex items-center space-x-3 text-xs">
                         <span id="scanProgressText" class="text-[11px] text-cyber-cyan font-mono">STATUS: IDLE</span>
-                        <button onclick="clearTerminalLog()" class="text-xs text-slate-500 hover:text-slate-300 transition">Clear Log</button>
+                        <button onclick="downloadTerminalLogs()" class="text-slate-400 hover:text-cyber-cyan transition" title="Download Log File">
+                            <i class="fa-solid fa-file-arrow-down"></i>
+                        </button>
+                        <button onclick="clearTerminalLog()" class="text-slate-500 hover:text-slate-300 transition">Clear</button>
                     </div>
                 </div>
 
@@ -246,18 +287,19 @@
                     <div id="scanProgressBar" class="bg-cyber-cyan h-1 w-0 transition-all duration-300"></div>
                 </div>
 
-                <div id="terminalLog" class="bg-cyber-black/95 p-4 h-56 overflow-y-auto text-xs space-y-1 font-mono text-slate-300">
-                    <div class="text-slate-500">[SYSTEM] SPECTRE-OSINT Engine initialized. Specify target domain above and launch scan.</div>
+                <div id="terminalLog" class="bg-cyber-black/95 p-4 h-48 overflow-y-auto text-xs space-y-1 font-mono text-slate-300">
+                    <div class="text-slate-500">[SYSTEM] SPECTRE-OSINT Engine initialized. Target domain specified. Press INITIALIZE SCAN to launch assessment.</div>
                 </div>
             </section>
 
-            <!-- Overview Dashboard Metrics -->
+            <!-- Risk Metric Cards & Gauge Breakdown -->
             <section id="resultsSection" class="space-y-6">
+                <!-- Metrics Summary Cards -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div class="bg-cyber-card p-4 rounded-lg border border-cyber-border flex items-center justify-between">
                         <div>
                             <span class="text-[10px] text-slate-400 block tracking-wider uppercase">OVERALL RISK GRADE</span>
-                            <span id="valRiskGrade" class="text-2xl font-bold text-cyber-amber mt-1 text-glow-cyan block">B- (MODERATE)</span>
+                            <span id="valRiskGrade" class="text-2xl font-bold text-cyber-amber mt-1 text-glow-cyan block">C+ (MODERATE)</span>
                         </div>
                         <div class="w-10 h-10 rounded bg-cyber-amber/10 border border-cyber-amber/30 text-cyber-amber flex items-center justify-center text-lg">
                             <i class="fa-solid fa-triangle-exclamation"></i>
@@ -266,7 +308,7 @@
 
                     <div class="bg-cyber-card p-4 rounded-lg border border-cyber-border flex items-center justify-between">
                         <div>
-                            <span class="text-[10px] text-slate-400 block tracking-wider uppercase">SUBDOMAINS DETECTED</span>
+                            <span class="text-[10px] text-slate-400 block tracking-wider uppercase">SUBDOMAINS DISCOVERED</span>
                             <span id="valSubsCount" class="text-2xl font-bold text-cyber-cyan mt-1 block">8 ACTIVE</span>
                         </div>
                         <div class="w-10 h-10 rounded bg-cyber-cyan/10 border border-cyber-cyan/30 text-cyber-cyan flex items-center justify-center text-lg">
@@ -277,7 +319,7 @@
                     <div class="bg-cyber-card p-4 rounded-lg border border-cyber-border flex items-center justify-between">
                         <div>
                             <span class="text-[10px] text-slate-400 block tracking-wider uppercase">HTTP SECURITY HEADERS</span>
-                            <span id="valHeaderScore" class="text-2xl font-bold text-cyber-red mt-1 block">2/6 SECURE</span>
+                            <span id="valHeaderScore" class="text-2xl font-bold text-cyber-red mt-1 block">2 / 6 PASSING</span>
                         </div>
                         <div class="w-10 h-10 rounded bg-cyber-red/10 border border-cyber-red/30 text-cyber-red flex items-center justify-center text-lg">
                             <i class="fa-solid fa-shield-xmark"></i>
@@ -287,7 +329,7 @@
                     <div class="bg-cyber-card p-4 rounded-lg border border-cyber-border flex items-center justify-between">
                         <div>
                             <span class="text-[10px] text-slate-400 block tracking-wider uppercase">OPEN PORTS FOUND</span>
-                            <span id="valOpenPorts" class="text-2xl font-bold text-cyber-green mt-1 block">3 PORTS</span>
+                            <span id="valOpenPorts" class="text-2xl font-bold text-cyber-green mt-1 block">4 PORTS</span>
                         </div>
                         <div class="w-10 h-10 rounded bg-cyber-green/10 border border-cyber-green/30 text-cyber-green flex items-center justify-center text-lg">
                             <i class="fa-solid fa-network-wired"></i>
@@ -295,9 +337,38 @@
                     </div>
                 </div>
 
+                <!-- Risk Score Visual Progress Matrix -->
+                <div class="bg-cyber-card p-4 md:p-6 rounded-lg border border-cyber-border space-y-3">
+                    <div class="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-cyber-cyan">
+                        <span><i class="fa-solid fa-gauge-high mr-2"></i> Threat Exposure Breakdown</span>
+                        <span id="riskScorePercentage" class="text-cyber-amber">SCORE: 68/100 (ELEVATED RISK)</span>
+                    </div>
+                    <div class="w-full bg-cyber-black rounded-full h-3 overflow-hidden border border-cyber-border">
+                        <div id="riskProgressBar" class="bg-gradient-to-r from-cyber-green via-cyber-amber to-cyber-red h-full w-[68%] transition-all duration-700"></div>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-400 pt-2">
+                        <div class="bg-cyber-black/60 p-2 rounded border border-cyber-border/60">
+                            <span class="block text-[10px] text-slate-500">DNS Security</span>
+                            <span class="text-cyber-green font-bold">Low Risk (85%)</span>
+                        </div>
+                        <div class="bg-cyber-black/60 p-2 rounded border border-cyber-border/60">
+                            <span class="block text-[10px] text-slate-500">HTTP Headers</span>
+                            <span class="text-cyber-red font-bold">High Risk (33%)</span>
+                        </div>
+                        <div class="bg-cyber-black/60 p-2 rounded border border-cyber-border/60">
+                            <span class="block text-[10px] text-slate-500">Subdomain Surface</span>
+                            <span class="text-cyber-amber font-bold">Medium Risk (60%)</span>
+                        </div>
+                        <div class="bg-cyber-black/60 p-2 rounded border border-cyber-border/60">
+                            <span class="block text-[10px] text-slate-500">Port Exposure</span>
+                            <span class="text-cyber-amber font-bold">Medium Risk (65%)</span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Detailed Audit Findings Tabs -->
                 <div class="bg-cyber-card rounded-lg border border-cyber-border overflow-hidden shadow-xl">
-                    <!-- Tab Navigation -->
+                    <!-- Tab Navigation Header -->
                     <div class="flex border-b border-cyber-border bg-cyber-panel/60 overflow-x-auto">
                         <button onclick="switchTab('tab-dns')" id="tabBtn-dns" class="px-5 py-3 text-xs font-bold border-b-2 border-cyber-cyan text-cyber-cyan bg-cyber-black/40 whitespace-nowrap">
                             <i class="fa-solid fa-server mr-2"></i> DNS & WHOIS
@@ -327,11 +398,12 @@
                                         <i class="fa-solid fa-id-card"></i> WHOIS Domain Information
                                     </h3>
                                     <div class="bg-cyber-black/80 p-4 rounded border border-cyber-border text-xs space-y-2">
-                                        <div class="flex justify-between border-b border-slate-800 pb-1.5"><span class="text-slate-500">Domain Name:</span> <span id="whoisDomain" class="text-slate-200">example.com</span></div>
-                                        <div class="flex justify-between border-b border-slate-800 pb-1.5"><span class="text-slate-500">Registrar:</span> <span id="whoisRegistrar" class="text-slate-200">MarkMonitor Inc.</span></div>
-                                        <div class="flex justify-between border-b border-slate-800 pb-1.5"><span class="text-slate-500">Creation Date:</span> <span id="whoisCreated" class="text-slate-200">1995-08-14</span></div>
-                                        <div class="flex justify-between border-b border-slate-800 pb-1.5"><span class="text-slate-500">Expiration Date:</span> <span id="whoisExpiry" class="text-slate-200">2028-08-13</span></div>
-                                        <div class="flex justify-between"><span class="text-slate-500">Name Servers:</span> <span id="whoisNS" class="text-slate-200">ns1.cloudflare.com, ns2.cloudflare.com</span></div>
+                                        <div class="flex justify-between border-b border-slate-800 pb-1.5"><span class="text-slate-500">Domain Name:</span> <span id="whoisDomain" class="text-slate-200 font-mono">target-corp.com</span></div>
+                                        <div class="flex justify-between border-b border-slate-800 pb-1.5"><span class="text-slate-500">Registrar:</span> <span id="whoisRegistrar" class="text-slate-200">Cloudflare Registrar, Inc.</span></div>
+                                        <div class="flex justify-between border-b border-slate-800 pb-1.5"><span class="text-slate-500">Creation Date:</span> <span id="whoisCreated" class="text-slate-200">2018-04-12</span></div>
+                                        <div class="flex justify-between border-b border-slate-800 pb-1.5"><span class="text-slate-500">Expiration Date:</span> <span id="whoisExpiry" class="text-slate-200">2027-04-12</span></div>
+                                        <div class="flex justify-between border-b border-slate-800 pb-1.5"><span class="text-slate-500">DNSSEC:</span> <span id="whoisDNSSEC" class="text-cyber-green font-bold">unsigned / active</span></div>
+                                        <div class="flex justify-between"><span class="text-slate-500">Name Servers:</span> <span id="whoisNS" class="text-slate-200 font-mono">ns1.cloudflare.com, ns2.cloudflare.com</span></div>
                                     </div>
                                 </div>
 
@@ -339,12 +411,8 @@
                                     <h3 class="text-xs font-bold uppercase tracking-wider text-cyber-cyan flex items-center gap-2">
                                         <i class="fa-solid fa-globe"></i> DNS Record Configuration
                                     </h3>
-                                    <div class="bg-cyber-black/80 p-4 rounded border border-cyber-border text-xs space-y-2 font-mono">
-                                        <div class="flex justify-between border-b border-slate-800 pb-1"><span class="text-cyber-green font-bold">A</span> <span>93.184.216.34</span></div>
-                                        <div class="flex justify-between border-b border-slate-800 pb-1"><span class="text-cyber-green font-bold">AAAA</span> <span>2606:2800:220:1:248:1893:25c8:1946</span></div>
-                                        <div class="flex justify-between border-b border-slate-800 pb-1"><span class="text-cyber-green font-bold">MX</span> <span>mail.example.com (Priority 10)</span></div>
-                                        <div class="flex justify-between border-b border-slate-800 pb-1"><span class="text-cyber-green font-bold">TXT (SPF)</span> <span class="text-slate-400">v=spf1 include:_spf.google.com ~all</span></div>
-                                        <div class="flex justify-between"><span class="text-cyber-green font-bold">DMARC</span> <span class="text-slate-400">v=DMARC1; p=none;</span></div>
+                                    <div id="dnsRecordList" class="bg-cyber-black/80 p-4 rounded border border-cyber-border text-xs space-y-2 font-mono">
+                                        <!-- Dynamic DNS records -->
                                     </div>
                                 </div>
                             </div>
@@ -352,19 +420,36 @@
 
                         <!-- TAB 2: Subdomains -->
                         <div id="tab-subdomains" class="tab-content hidden space-y-4">
-                            <h3 class="text-xs font-bold uppercase tracking-wider text-cyber-cyan">Discovered Target Subdomains</h3>
-                            <div class="overflow-x-auto">
+                            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                <h3 class="text-xs font-bold uppercase tracking-wider text-cyber-cyan">Discovered Target Subdomains</h3>
+                                
+                                <div class="flex items-center gap-2 w-full sm:w-auto">
+                                    <div class="relative flex-1 sm:w-64">
+                                        <input 
+                                            type="text" 
+                                            id="subdomainSearch" 
+                                            oninput="filterSubdomains()" 
+                                            placeholder="Filter subdomains or IP..." 
+                                            class="w-full pl-8 pr-3 py-1.5 bg-cyber-black border border-cyber-border focus:border-cyber-cyan rounded text-xs text-slate-200 focus:outline-none"
+                                        />
+                                        <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-500 text-xs"></i>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="overflow-x-auto border border-cyber-border rounded">
                                 <table class="w-full text-left text-xs">
-                                    <thead class="bg-cyber-panel text-slate-400">
+                                    <thead class="bg-cyber-panel text-slate-400 border-b border-cyber-border">
                                         <tr>
                                             <th class="p-3">Subdomain</th>
                                             <th class="p-3">Resolved IP</th>
                                             <th class="p-3">HTTP Status</th>
                                             <th class="p-3">Exposure Risk</th>
+                                            <th class="p-3">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody id="subdomainTable" class="divide-y divide-cyber-border bg-cyber-black/50">
-                                        <!-- Dynamic entries -->
+                                        <!-- Dynamic entries will be inserted safely here -->
                                     </tbody>
                                 </table>
                             </div>
@@ -373,9 +458,9 @@
                         <!-- TAB 3: Security Headers -->
                         <div id="tab-headers" class="tab-content hidden space-y-4">
                             <h3 class="text-xs font-bold uppercase tracking-wider text-cyber-cyan">HTTP Response Header Security Evaluation</h3>
-                            <div class="overflow-x-auto">
+                            <div class="overflow-x-auto border border-cyber-border rounded">
                                 <table class="w-full text-left text-xs">
-                                    <thead class="bg-cyber-panel text-slate-400">
+                                    <thead class="bg-cyber-panel text-slate-400 border-b border-cyber-border">
                                         <tr>
                                             <th class="p-3">Header Field</th>
                                             <th class="p-3">State</th>
@@ -392,14 +477,35 @@
                         <!-- TAB 4: Open Ports -->
                         <div id="tab-ports" class="tab-content hidden space-y-4">
                             <h3 class="text-xs font-bold uppercase tracking-wider text-cyber-cyan">Port & Service Enumeration</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="portList">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="portList">
                                 <!-- Dynamic port entries -->
                             </div>
                         </div>
 
                         <!-- TAB 5: Hardening Plan -->
                         <div id="tab-remediation" class="tab-content hidden space-y-4">
-                            <h3 class="text-xs font-bold uppercase tracking-wider text-cyber-cyan">Prioritized Security Fixes & Vulnerability Remediation</h3>
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-xs font-bold uppercase tracking-wider text-cyber-cyan">Prioritized Security Fixes & Server Snippets</h3>
+                                
+                                <select id="serverPresetSelect" onchange="updateConfigCodeSnippet()" class="bg-cyber-black border border-cyber-border text-xs text-cyber-cyan px-2 py-1 rounded focus:outline-none">
+                                    <option value="nginx">Config Format: Nginx</option>
+                                    <option value="apache">Config Format: Apache (.htaccess)</option>
+                                    <option value="caddy">Config Format: Caddyfile</option>
+                                    <option value="cloudflare">Config Format: Cloudflare Workers / Headers Rule</option>
+                                </select>
+                            </div>
+
+                            <!-- Interactive Server Snippet Copy Window -->
+                            <div class="bg-cyber-black p-4 rounded border border-cyber-border font-mono text-xs relative group">
+                                <div class="flex items-center justify-between text-slate-500 mb-2 border-b border-slate-800 pb-2">
+                                    <span id="configSnippetTitle"><i class="fa-solid fa-code text-cyber-cyan mr-1"></i> Recommended Nginx Security Headers Config</span>
+                                    <button onclick="copySnippetCode()" class="text-cyber-cyan hover:text-white transition flex items-center gap-1">
+                                        <i class="fa-solid fa-copy"></i> Copy Snippet
+                                    </button>
+                                </div>
+                                <pre id="configCodeBlock" class="text-slate-300 overflow-x-auto whitespace-pre p-2 bg-cyber-card/60 rounded border border-slate-900"></pre>
+                            </div>
+
                             <div class="space-y-3" id="remediationList">
                                 <!-- Dynamic hardening recommendations -->
                             </div>
@@ -416,11 +522,12 @@
         </footer>
     </div>
 
-    <!-- JavaScript Logic -->
+    <!-- JavaScript Application Logic -->
     <script>
-        // Matrix Canvas Background Animation
+        // Matrix Canvas Animation Setup
         const canvas = document.getElementById('matrixCanvas');
         const ctx = canvas.getContext('2d');
+        let matrixInterval = null;
 
         function resizeCanvas() {
             canvas.width = window.innerWidth;
@@ -429,7 +536,7 @@
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
 
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*§µΞΨΩ';
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*§µΞΨΩ01';
         const fontSize = 14;
         let columns = Math.floor(canvas.width / fontSize);
         let drops = Array(columns).fill(1);
@@ -451,9 +558,39 @@
                 drops[i]++;
             }
         }
-        setInterval(drawMatrix, 33);
+        matrixInterval = setInterval(drawMatrix, 33);
 
-        // Terminal Logging Helper with Typing Delay Effect
+        // Visual Display FX Toggles
+        let crtEnabled = true;
+        let matrixEnabled = true;
+
+        function toggleCRT() {
+            crtEnabled = !crtEnabled;
+            const overlay = document.getElementById('crtOverlay');
+            overlay.style.opacity = crtEnabled ? '1' : '0';
+            document.getElementById('crtToggleBtn').classList.toggle('opacity-50', !crtEnabled);
+            logToTerminal(`CRT Scanline overlay set to: ${crtEnabled ? 'ENABLED' : 'DISABLED'}`, 'info');
+        }
+
+        function toggleMatrix() {
+            matrixEnabled = !matrixEnabled;
+            canvas.style.opacity = matrixEnabled ? '0.18' : '0';
+            document.getElementById('matrixToggleBtn').classList.toggle('opacity-50', !matrixEnabled);
+            logToTerminal(`Matrix background FX set to: ${matrixEnabled ? 'ENABLED' : 'DISABLED'}`, 'info');
+        }
+
+        // Global Recon Data Store
+        let activeTargetData = {
+            domain: "target-corp.com",
+            subdomains: [],
+            headers: [],
+            ports: [],
+            dns: []
+        };
+
+        // Terminal Logging System
+        let terminalHistory = [];
+
         function logToTerminal(message, type = 'info') {
             const terminal = document.getElementById('terminalLog');
             const time = new Date().toISOString().substring(11, 19);
@@ -466,6 +603,9 @@
             if (type === 'danger') { colorClass = 'text-cyber-red font-semibold'; prefix = '[ALERT]'; }
             if (type === 'cyan') { colorClass = 'text-cyber-cyan font-bold'; prefix = '[EXEC]'; }
 
+            const formattedLine = `[${time}] ${prefix} ${message}`;
+            terminalHistory.push(formattedLine);
+
             const logLine = document.createElement('div');
             logLine.className = colorClass;
             logLine.innerHTML = `<span class="text-slate-600">[${time}]</span> <span class="opacity-80">${prefix}</span> ${message}`;
@@ -476,9 +616,21 @@
 
         function clearTerminalLog() {
             document.getElementById('terminalLog').innerHTML = '<div class="text-slate-500">[SYSTEM] Terminal logs cleared. Ready for next sequence.</div>';
+            terminalHistory = [];
         }
 
-        // Tab Switching Engine
+        function downloadTerminalLogs() {
+            const content = terminalHistory.join('\n');
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `spectre-recon-${activeTargetData.domain || 'scan'}-log.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Tab Navigation
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('[id^="tabBtn-"]').forEach(btn => {
@@ -488,21 +640,25 @@
 
             document.getElementById(tabId).classList.remove('hidden');
             const activeBtn = document.getElementById('tabBtn-' + tabId.replace('tab-', ''));
-            activeBtn.classList.add('border-cyber-cyan', 'text-cyber-cyan', 'bg-cyber-black/40');
-            activeBtn.classList.remove('border-transparent', 'text-slate-400');
+            if (activeBtn) {
+                activeBtn.classList.add('border-cyber-cyan', 'text-cyber-cyan', 'bg-cyber-black/40');
+                activeBtn.classList.remove('border-transparent', 'text-slate-400');
+            }
         }
 
-        // Simulated Security Scan Orchestration
+        // Simulated Dynamic Security Scan Orchestration
         async function executeReconScan(event) {
             event.preventDefault();
-            const target = document.getElementById('targetDomain').value.trim();
+            const target = document.getElementById('targetDomain').value.trim().toLowerCase().replace(/^https?:\/\//, '');
             if (!target) return;
+
+            activeTargetData.domain = target;
 
             const scanBtn = document.getElementById('scanBtn');
             const progressBar = document.getElementById('scanProgressBar');
             const progressText = document.getElementById('scanProgressText');
 
-            // Set UI State to Scanning
+            // UI Scanning State
             scanBtn.disabled = true;
             scanBtn.classList.add('opacity-50');
             scanBtn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> SCANNING...';
@@ -512,73 +668,266 @@
             logToTerminal(`Initiating target assessment sequence for target: ${target}`, 'cyan');
 
             const steps = [
-                { percent: 15, msg: `Resolving primary A/AAAA IPv4 & IPv6 records...`, type: 'info' },
-                { percent: 30, msg: `Querying WHOIS domain registration database...`, type: 'info' },
-                { percent: 45, msg: `Executing certificate transparency search (CRT.sh)...`, type: 'info' },
-                { percent: 60, msg: `Discovered subdomains: api.${target}, staging.${target}, dev.${target}`, type: 'success' },
-                { percent: 75, msg: `Inspecting HTTP response security headers...`, type: 'info' },
-                { percent: 85, msg: `ALERT: Content-Security-Policy (CSP) header is MISSING!`, type: 'danger' },
-                { percent: 92, msg: `Running port scan on top essential services...`, type: 'info' },
-                { percent: 100, msg: `Scan sequence complete. Compiling intelligence report...`, type: 'success' }
+                { percent: 12, msg: `Resolving primary A/AAAA IPv4 & IPv6 records for ${target}...`, type: 'info' },
+                { percent: 28, msg: `Querying WHOIS domain registration database...`, type: 'info' },
+                { percent: 42, msg: `Executing certificate transparency search (CRT.sh)...`, type: 'info' },
+                { percent: 58, msg: `Discovered subdomains: api.${target}, staging.${target}, dev.${target}`, type: 'success' },
+                { percent: 74, msg: `Inspecting HTTP response security headers...`, type: 'info' },
+                { percent: 85, msg: `ALERT: Content-Security-Policy & X-Frame-Options missing!`, type: 'danger' },
+                { percent: 92, msg: `Running port scan on top essential web/server services...`, type: 'info' },
+                { percent: 100, msg: `Scan sequence complete. Generating intelligence report...`, type: 'success' }
             ];
 
             for (const step of steps) {
-                await new Promise(r => setTimeout(r, 600));
+                await new Promise(r => setTimeout(r, 450));
                 progressBar.style.width = `${step.percent}%`;
                 logToTerminal(step.msg, step.type);
             }
 
-            // Populate Dynamic Results
+            // Populate DNS Data
             document.getElementById('whoisDomain').textContent = target;
             document.getElementById('whoisRegistrar').textContent = 'Cloudflare Registrar, Inc.';
-            document.getElementById('whoisCreated').textContent = '2021-03-15';
-            document.getElementById('whoisExpiry').textContent = '2027-03-15';
+            document.getElementById('whoisCreated').textContent = '2019-06-14';
+            document.getElementById('whoisExpiry').textContent = '2028-06-14';
+            document.getElementById('whoisNS').textContent = `ns1.${target}, ns2.${target}`;
 
-            // Render Subdomains
-            document.getElementById('subdomainTable').innerHTML = `
-                <tr><td class="p-3 text-slate-200">api.${target}</td><td class="p-3">104.21.48.11</td><td class="p-3 text-cyber-green">200 OK</td><td class="p-3 text-slate-400">Low</td></tr>
-                <tr><td class="p-3 text-slate-200">app.${target}</td><td class="p-3">104.21.48.12</td><td class="p-3 text-cyber-green">200 OK</td><td class="p-3 text-slate-400">Low</td></tr>
-                <tr><td class="p-3 text-slate-200">staging.${target}</td><td class="p-3">172.67.133.22</td><td class="p-3 text-cyber-amber">403 Forbidden</td><td class="p-3 text-cyber-amber">Medium Exposure</td></tr>
-                <tr><td class="p-3 text-slate-200">dev.${target}</td><td class="p-3">172.67.133.88</td><td class="p-3 text-cyber-red">200 OK (Unprotected)</td><td class="p-3 text-cyber-red">High Exposure</td></tr>
+            document.getElementById('dnsRecordList').innerHTML = `
+                <div class="flex justify-between border-b border-slate-800 pb-1"><span class="text-cyber-green font-bold">A</span> <span>104.21.48.11</span></div>
+                <div class="flex justify-between border-b border-slate-800 pb-1"><span class="text-cyber-green font-bold">AAAA</span> <span>2606:4700:3038::6815:300b</span></div>
+                <div class="flex justify-between border-b border-slate-800 pb-1"><span class="text-cyber-green font-bold">MX</span> <span>mail.${target} (Priority 10)</span></div>
+                <div class="flex justify-between border-b border-slate-800 pb-1"><span class="text-cyber-green font-bold">TXT (SPF)</span> <span class="text-slate-400">v=spf1 include:_spf.google.com ~all</span></div>
+                <div class="flex justify-between"><span class="text-cyber-green font-bold">DMARC</span> <span class="text-slate-400">v=DMARC1; p=none; sp=none;</span></div>
             `;
 
-            // Render Header Audit
+            // Prepare Dynamic Subdomain Data
+            activeTargetData.subdomains = [
+                { name: `www.${target}`, ip: '104.21.48.11', status: '200 OK', statusClass: 'text-cyber-green', risk: 'Low', riskClass: 'bg-cyber-green/20 text-cyber-green border-cyber-green/30' },
+                { name: `api.${target}`, ip: '104.21.48.12', status: '200 OK', statusClass: 'text-cyber-green', risk: 'Low', riskClass: 'bg-cyber-green/20 text-cyber-green border-cyber-green/30' },
+                { name: `app.${target}`, ip: '104.21.48.15', status: '200 OK', statusClass: 'text-cyber-green', risk: 'Low', riskClass: 'bg-cyber-green/20 text-cyber-green border-cyber-green/30' },
+                { name: `staging.${target}`, ip: '172.67.133.22', status: '403 Forbidden', statusClass: 'text-cyber-amber', risk: 'Medium Exposure', riskClass: 'bg-cyber-amber/20 text-cyber-amber border-cyber-amber/30' },
+                { name: `dev.${target}`, ip: '172.67.133.88', status: '200 OK (Unprotected)', statusClass: 'text-cyber-red font-bold', risk: 'High Exposure', riskClass: 'bg-cyber-red/20 text-cyber-red border-cyber-red/30' },
+                { name: `vpn.${target}`, ip: '192.168.10.5', status: '401 Unauthorized', statusClass: 'text-cyber-cyan', risk: 'Low', riskClass: 'bg-cyber-green/20 text-cyber-green border-cyber-green/30' },
+                { name: `mail.${target}`, ip: '104.21.48.99', status: '200 OK', statusClass: 'text-cyber-green', risk: 'Low', riskClass: 'bg-cyber-green/20 text-cyber-green border-cyber-green/30' },
+                { name: `grafana-internal.${target}`, ip: '172.67.133.102', status: '200 OK (Login)', statusClass: 'text-cyber-amber', risk: 'Medium Exposure', riskClass: 'bg-cyber-amber/20 text-cyber-amber border-cyber-amber/30' }
+            ];
+
+            renderSubdomainsTable(activeTargetData.subdomains);
+
+            // Populate HTTP Security Headers Table
             document.getElementById('headerTable').innerHTML = `
-                <tr><td class="p-3 font-bold text-slate-200">Content-Security-Policy</td><td class="p-3"><span class="px-2 py-0.5 rounded bg-cyber-red/20 text-cyber-red border border-cyber-red/40">MISSING</span></td><td class="p-3 text-slate-400">High risk of Cross-Site Scripting (XSS).</td></tr>
-                <tr><td class="p-3 font-bold text-slate-200">Strict-Transport-Security</td><td class="p-3"><span class="px-2 py-0.5 rounded bg-cyber-green/20 text-cyber-green border border-cyber-green/40">PRESENT</span></td><td class="p-3 text-slate-400">max-age=31536000; includeSubDomains</td></tr>
-                <tr><td class="p-3 font-bold text-slate-200">X-Frame-Options</td><td class="p-3"><span class="px-2 py-0.5 rounded bg-cyber-red/20 text-cyber-red border border-cyber-red/40">MISSING</span></td><td class="p-3 text-slate-400">Vulnerable to Clickjacking attack vector.</td></tr>
-                <tr><td class="p-3 font-bold text-slate-200">X-Content-Type-Options</td><td class="p-3"><span class="px-2 py-0.5 rounded bg-cyber-green/20 text-cyber-green border border-cyber-green/40">PRESENT</span></td><td class="p-3 text-slate-400">nosniff</td></tr>
+                <tr><td class="p-3 font-bold text-slate-200">Strict-Transport-Security (HSTS)</td><td class="p-3"><span class="px-2 py-0.5 rounded bg-cyber-green/20 text-cyber-green border border-cyber-green/40">PASS</span></td><td class="p-3 text-slate-400"><code>max-age=31536000; includeSubDomains</code> (HTTPS enforced).</td></tr>
+                <tr><td class="p-3 font-bold text-slate-200">Content-Security-Policy (CSP)</td><td class="p-3"><span class="px-2 py-0.5 rounded bg-cyber-red/20 text-cyber-red border border-cyber-red/40">MISSING</span></td><td class="p-3 text-slate-400">High risk of Cross-Site Scripting (XSS) and code injection.</td></tr>
+                <tr><td class="p-3 font-bold text-slate-200">X-Frame-Options</td><td class="p-3"><span class="px-2 py-0.5 rounded bg-cyber-red/20 text-cyber-red border border-cyber-red/40">MISSING</span></td><td class="p-3 text-slate-400">Vulnerable to Clickjacking attack vectors in iFrames.</td></tr>
+                <tr><td class="p-3 font-bold text-slate-200">X-Content-Type-Options</td><td class="p-3"><span class="px-2 py-0.5 rounded bg-cyber-green/20 text-cyber-green border border-cyber-green/40">PASS</span></td><td class="p-3 text-slate-400">Set to <code>nosniff</code>. Prevents MIME-type sniffing.</td></tr>
+                <tr><td class="p-3 font-bold text-slate-200">Referrer-Policy</td><td class="p-3"><span class="px-2 py-0.5 rounded bg-cyber-amber/20 text-cyber-amber border border-cyber-amber/40">WEAK</span></td><td class="p-3 text-slate-400">Set to default; recommended: <code>strict-origin-when-cross-origin</code>.</td></tr>
+                <tr><td class="p-3 font-bold text-slate-200">Permissions-Policy</td><td class="p-3"><span class="px-2 py-0.5 rounded bg-cyber-red/20 text-cyber-red border border-cyber-red/40">MISSING</span></td><td class="p-3 text-slate-400">Browser features (camera, mic, geolocation) not explicitly restricted.</td></tr>
             `;
 
-            // Render Ports
+            // Populate Open Ports Card Grid
             document.getElementById('portList').innerHTML = `
-                <div class="p-3 rounded bg-cyber-black border border-cyber-border"><span class="text-cyber-green font-bold block">PORT 80 / HTTP</span><span class="text-slate-400 text-[11px]">Open • Nginx 1.18.0</span></div>
-                <div class="p-3 rounded bg-cyber-black border border-cyber-border"><span class="text-cyber-green font-bold block">PORT 443 / HTTPS</span><span class="text-slate-400 text-[11px]">Open • Cloudflare SSL</span></div>
-                <div class="p-3 rounded bg-cyber-black border border-cyber-border"><span class="text-cyber-amber font-bold block">PORT 8080 / HTTP-ALT</span><span class="text-slate-400 text-[11px]">Open • Dev Admin Portal</span></div>
+                <div class="p-4 rounded bg-cyber-black border border-cyber-border space-y-1">
+                    <div class="flex justify-between items-center"><span class="text-cyber-green font-bold text-sm">PORT 80 / HTTP</span><span class="px-2 py-0.5 text-[10px] bg-cyber-green/20 text-cyber-green rounded">OPEN</span></div>
+                    <div class="text-slate-400 text-xs">Service: Nginx 1.24.0</div>
+                    <div class="text-[11px] text-slate-500">Redirects to 443 HTTPS</div>
+                </div>
+                <div class="p-4 rounded bg-cyber-black border border-cyber-border space-y-1">
+                    <div class="flex justify-between items-center"><span class="text-cyber-green font-bold text-sm">PORT 443 / HTTPS</span><span class="px-2 py-0.5 text-[10px] bg-cyber-green/20 text-cyber-green rounded">OPEN</span></div>
+                    <div class="text-slate-400 text-xs">Service: Cloudflare TLS v1.3</div>
+                    <div class="text-[11px] text-slate-500">Valid Certificate (RSA 2048)</div>
+                </div>
+                <div class="p-4 rounded bg-cyber-black border border-cyber-border space-y-1">
+                    <div class="flex justify-between items-center"><span class="text-cyber-amber font-bold text-sm">PORT 22 / SSH</span><span class="px-2 py-0.5 text-[10px] bg-cyber-amber/20 text-cyber-amber rounded">FILTERED</span></div>
+                    <div class="text-slate-400 text-xs">Service: OpenSSH 8.9p1</div>
+                    <div class="text-[11px] text-slate-500">Public Key Auth Only</div>
+                </div>
+                <div class="p-4 rounded bg-cyber-black border border-cyber-border space-y-1">
+                    <div class="flex justify-between items-center"><span class="text-cyber-red font-bold text-sm">PORT 8080 / HTTP-ALT</span><span class="px-2 py-0.5 text-[10px] bg-cyber-red/20 text-cyber-red rounded">EXPOSED</span></div>
+                    <div class="text-slate-400 text-xs">Service: Staging Dashboard</div>
+                    <div class="text-[11px] text-slate-500">Bypasses Cloudflare WAF</div>
+                </div>
             `;
 
-            // Render Remediation Steps
+            // Populate Remediation List
             document.getElementById('remediationList').innerHTML = `
                 <div class="p-4 bg-cyber-black border-l-4 border-cyber-red rounded-r">
                     <h4 class="font-bold text-white flex items-center gap-2"><i class="fa-solid fa-shield-virus text-cyber-red"></i> 1. Enforce Content Security Policy (CSP) Header</h4>
                     <p class="text-slate-400 text-xs mt-1">Configure Nginx or CDN response headers to restrict unauthorized script execution and guard against XSS.</p>
                 </div>
+                <div class="p-4 bg-cyber-black border-l-4 border-cyber-red rounded-r">
+                    <h4 class="font-bold text-white flex items-center gap-2"><i class="fa-solid fa-window-restore text-cyber-red"></i> 2. Mitigate Clickjacking via X-Frame-Options</h4>
+                    <p class="text-slate-400 text-xs mt-1">Prevent embedding <code>${target}</code> within unauthorized third-party iFrames by returning <code>DENY</code> or <code>SAMEORIGIN</code>.</p>
+                </div>
                 <div class="p-4 bg-cyber-black border-l-4 border-cyber-amber rounded-r">
-                    <h4 class="font-bold text-white flex items-center gap-2"><i class="fa-solid fa-lock text-cyber-amber"></i> 2. Restrict Access to Development Subdomains</h4>
-                    <p class="text-slate-400 text-xs mt-1">Restrict public DNS accessibility for <code>dev.${target}</code> and place it behind VPN authentication.</p>
+                    <h4 class="font-bold text-white flex items-center gap-2"><i class="fa-solid fa-lock text-cyber-amber"></i> 3. Restrict Public Access to Staging & Dev Subdomains</h4>
+                    <p class="text-slate-400 text-xs mt-1">Restrict public DNS accessibility for <code>dev.${target}</code> and place it behind VPN or OAuth authentication.</p>
                 </div>
             `;
 
-            // Reset Scan Button
+            updateConfigCodeSnippet();
+
+            // Reset Button State
             scanBtn.disabled = false;
             scanBtn.classList.remove('opacity-50');
             scanBtn.innerHTML = '<i class="fa-solid fa-crosshairs text-base"></i> INITIALIZE SCAN';
             progressText.textContent = "STATUS: SCAN COMPLETE";
         }
 
+        // Render Subdomains Table with fixed, safe HTML structure
+        function renderSubdomainsTable(subdomains) {
+            const tbody = document.getElementById('subdomainTable');
+            tbody.innerHTML = '';
+
+            subdomains.forEach(sub => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="p-3 text-slate-200 font-mono">${sub.name}</td>
+                    <td class="p-3 font-mono text-slate-400">${sub.ip}</td>
+                    <td class="p-3 ${sub.statusClass}">${sub.status}</td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded border text-[10px] ${sub.riskClass}">${sub.risk}</span></td>
+                    <td class="p-3">
+                        <button onclick="copyToClipboard('${sub.name}')" class="text-cyber-cyan hover:text-white transition" title="Copy Subdomain">
+                            <i class="fa-solid fa-copy"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Filter Subdomains Search Input Function
+        function filterSubdomains() {
+            const query = document.getElementById('subdomainSearch').value.toLowerCase();
+            const filtered = activeTargetData.subdomains.filter(s => 
+                s.name.toLowerCase().includes(query) || s.ip.toLowerCase().includes(query)
+            );
+            renderSubdomainsTable(filtered);
+        }
+
+        // Code Snippet Presets Generator
+        function updateConfigCodeSnippet() {
+            const preset = document.getElementById('serverPresetSelect').value;
+            const target = activeTargetData.domain || 'example.com';
+            const codeBlock = document.getElementById('configCodeBlock');
+            const titleBlock = document.getElementById('configSnippetTitle');
+
+            if (preset === 'nginx') {
+                titleBlock.innerHTML = '<i class="fa-solid fa-code text-cyber-cyan mr-1"></i> Recommended Nginx Security Headers Configuration';
+                codeBlock.textContent = 
+`server {
+    listen 443 ssl http2;
+    server_name ${target} *.${target};
+
+    # Hardening Response Headers
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; object-src 'none';" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
+}`;
+            } else if (preset === 'apache') {
+                titleBlock.innerHTML = '<i class="fa-solid fa-code text-cyber-cyan mr-1"></i> Recommended Apache (.htaccess) Configuration';
+                codeBlock.textContent = 
+`<IfModule mod_headers.c>
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline';"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+</IfModule>`;
+            } else if (preset === 'caddy') {
+                titleBlock.innerHTML = '<i class="fa-solid fa-code text-cyber-cyan mr-1"></i> Recommended Caddyfile Configuration';
+                codeBlock.textContent = 
+`${target} {
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        Content-Security-Policy "default-src 'self';"
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "geolocation=(), microphone=(), camera=()"
+    }
+}`;
+            } else if (preset === 'cloudflare') {
+                titleBlock.innerHTML = '<i class="fa-solid fa-code text-cyber-cyan mr-1"></i> Recommended Cloudflare Workers Response Headers';
+                codeBlock.textContent = 
+`addEventListener('fetch', event => {
+    event.respondWith(handleRequest(event.request))
+})
+
+async function handleRequest(request) {
+    const response = await fetch(request)
+    const newHeaders = new Headers(response.headers)
+
+    newHeaders.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+    newHeaders.set('Content-Security-Policy', "default-src 'self';")
+    newHeaders.set('X-Frame-Options', 'SAMEORIGIN')
+    newHeaders.set('X-Content-Type-Options', 'nosniff')
+
+    return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: newHeaders
+    })
+}`;
+            }
+        }
+
+        function copySnippetCode() {
+            const text = document.getElementById('configCodeBlock').textContent;
+            copyToClipboard(text);
+        }
+
+        // Clipboard Helper
+        function copyToClipboard(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            logToTerminal(`Copied content to clipboard.`, 'success');
+        }
+
+        // Export Functions
+        function exportJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(activeTargetData, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `spectre-osint-${activeTargetData.domain || 'report'}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            logToTerminal(`Exported target assessment report as JSON.`, 'success');
+        }
+
+        function exportCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,Subdomain,Resolved IP,HTTP Status,Risk Exposure\n";
+            activeTargetData.subdomains.forEach(s => {
+                csvContent += `"${s.name}","${s.ip}","${s.status}","${s.risk}"\n`;
+            });
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `spectre-subdomains-${activeTargetData.domain || 'export'}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            logToTerminal(`Exported discovered subdomains list as CSV.`, 'success');
+        }
+
         function exportFullReport() {
             window.print();
         }
+
+        // Initialize default view state
+        window.onload = function() {
+            logToTerminal(`SPECTRE-OSINT engine v3.5.2 ready. Waiting for user input.`, 'info');
+            // Trigger initial mock scan on load
+            const initialEvent = { preventDefault: () => {} };
+            executeReconScan(initialEvent);
+        };
     </script>
 </body>
 </html>
