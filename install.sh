@@ -3,6 +3,15 @@ set -euo pipefail
 
 TARGET="${1:-example.com}"
 
+if [ ! -f "main.py" ]; then
+  if [ -d "$HOME/0xGhost" ]; then
+    cd "$HOME/0xGhost"
+  else
+    git clone https://github.com/omieee-11/0xGhost.git "$HOME/0xGhost"
+    cd "$HOME/0xGhost"
+  fi
+fi
+
 sudo apt update && sudo apt install -y \
   python3-venv \
   python3-pip \
