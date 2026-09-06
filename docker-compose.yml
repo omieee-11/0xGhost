@@ -1,0 +1,11 @@
+version: '3.8'
+services:
+  0xghost:
+    build: .
+    container_name: 0xghost
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./:/opt/0xGhost
+    stdin_open: true
+    tty: true

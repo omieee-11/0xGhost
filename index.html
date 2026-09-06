@@ -11,7 +11,7 @@
         h1 { color: var(--accent); text-align: center; margin-bottom: 10px; }
         .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
         button { background: var(--accent); color: #000; font-weight: bold; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
-        input[type="text"], input[type="password"] { width: 60%; padding: 10px; border-radius: 6px; border: 1px solid var(--border); background: #0b0f13; color: var(--text); }
+        input[type="text"] { width: 60%; padding: 10px; border-radius: 6px; border: 1px solid var(--border); background: #0b0f13; color: var(--text); }
         .small { font-size: 0.9rem; color: #9aa3ad; }
         pre { background: #000; padding: 15px; border-radius: 6px; border: 1px solid var(--border); color: #00ff88; overflow-x: auto; }
         .row { display:flex; gap: 12px; align-items:center; margin-bottom: 12px; }
@@ -31,11 +31,7 @@
                 <input type="text" id="targetInput" placeholder="e.g. example.com or 1.2.3.4" />
                 <button id="startBtn" onclick="startScan()">Start Scan</button>
             </div>
-            <div class="row">
-                <input type="password" id="tokenInput" placeholder="(optional) GitHub Personal Access Token to start Actions" />
-                <button onclick="openActionsRun()">Open Actions Run Page</button>
-            </div>
-            <div class="small">If you provide a GitHub token (repo:workflow scope), this page will request the workflow to run on your behalf and then fetch results when ready. If no token is provided, click "Open Actions Run Page" to manually run the workflow from GitHub UI.</div>
+            <div class="small">Enter the target and click Start — scans run inside the container and results will appear below when finished.</div>
             <div id="jobInfo" class="small" style="margin-top:10px;"></div>
         </div>
 
@@ -47,93 +43,75 @@
     </div>
 
     <script>
-        const owner = 'omieee-11';
-        const repo = '0xGhost';
-        const workflowFile = 'run_scan.yml';
-        const branch = 'main';
-
-        function openActionsRun() {
-            // Open the GitHub UI to manually run the workflow
-            window.open(`https://github.com/${owner}/${repo}/actions/workflows/${workflowFile}`);
-        }
+        let pollingHandle = null;
 
         async function startScan() {
             const target = document.getElementById('targetInput').value.trim();
-            const token = document.getElementById('tokenInput').value.trim();
             if (!target) { alert('Please enter a target.'); return; }
             document.getElementById('jobInfo').innerText = 'Starting scan...';
             document.getElementById('reportCard').style.display = 'none';
 
-            if (!token) {
-                document.getElementById('jobInfo').innerText = 'No token provided — open Actions page to run manually.';
-                openActionsRun();
-                return;
-            }
-
             try {
-                // Dispatch workflow
-                const url = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowFile}/dispatches`;
-                const body = { ref: branch, inputs: { target } };
-                const res = await fetch(url, {
+                const res = await fetch('/api/scan', {
                     method: 'POST',
-                    headers: {
-                        'Accept': 'application/vnd.github+json',
-                        'Authorization': 'token ' + token
-                    },
-                    body: JSON.stringify(body)
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({target})
                 });
-
-                if (res.status === 204) {
-                    document.getElementById('jobInfo').innerText = 'Workflow dispatched. Waiting for results (this may take several minutes)...';
-                    pollForResults(target);
-                } else {
-                    const text = await res.text();
-                    document.getElementById('jobInfo').innerText = `Failed to dispatch workflow: ${res.status} ${text}`;
+                if (!res.ok) {
+                    const err = await res.json();
+                    document.getElementById('jobInfo').innerText = 'Error: ' + (err.error || res.statusText);
+                    return;
                 }
+                const data = await res.json();
+                const jobId = data.job_id;
+                document.getElementById('jobInfo').innerText = `Scan started (job ${jobId}). Polling status...`;
+                pollStatus(jobId);
             } catch (e) {
-                document.getElementById('jobInfo').innerText = 'Error dispatching workflow. See console.';
-                console.error(e);
+                document.getElementById('jobInfo').innerText = 'Error starting scan.';
             }
         }
 
-        async function pollForResults(target) {
-            const rawUrlBase = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/results.json`;
-            const maxAttempts = 240; // ~20 minutes if interval=5s
-            const interval = 5000;
-            let attempts = 0;
-
-            document.getElementById('jobInfo').innerText = 'Polling for results.json in repository...';
-
-            const iv = setInterval(async () => {
-                attempts++;
+        function pollStatus(jobId) {
+            if (pollingHandle) clearInterval(pollingHandle);
+            pollingHandle = setInterval(async () => {
                 try {
-                    const res = await fetch(rawUrlBase + '?cb=' + Date.now());
-                    if (res.ok) {
-                        const data = await res.json();
-                        clearInterval(iv);
-                        renderReport(data);
-                        document.getElementById('jobInfo').innerText = 'Scan completed and results loaded.';
-                        return;
+                    const res = await fetch(`/api/status/${jobId}`);
+                    if (!res.ok) { document.getElementById('jobInfo').innerText = 'Failed to fetch job status.'; clearInterval(pollingHandle); return; }
+                    const s = await res.json();
+                    document.getElementById('jobInfo').innerText = `Job ${jobId} status: ${s.status}`;
+                    if (s.status === 'done') {
+                        clearInterval(pollingHandle);
+                        fetchResult(jobId);
+                    } else if (s.status === 'error') {
+                        clearInterval(pollingHandle);
+                        document.getElementById('jobInfo').innerText = `Job ${jobId} errored.`;
                     }
                 } catch (e) {
-                    // ignore parse errors until file is published
+                    document.getElementById('jobInfo').innerText = 'Error polling status.';
+                    clearInterval(pollingHandle);
                 }
+            }, 3000);
+        }
 
-                if (attempts >= maxAttempts) {
-                    clearInterval(iv);
-                    document.getElementById('jobInfo').innerText = 'Timed out waiting for results.json. Check Actions or run workflow manually.';
-                } else {
-                    document.getElementById('jobInfo').innerText = `Waiting for results... (attempt ${attempts})`;
-                }
-            }, interval);
+        async function fetchResult(jobId) {
+            document.getElementById('jobInfo').innerText = `Fetching result for job ${jobId}...`;
+            try {
+                const res = await fetch(`/api/result/${jobId}`);
+                if (res.status === 202) { document.getElementById('jobInfo').innerText = 'Result not ready yet.'; return; }
+                if (!res.ok) { const err = await res.json(); document.getElementById('jobInfo').innerText = 'Error: ' + (err.error || res.statusText); return; }
+                const report = await res.json();
+                renderReport(report);
+                document.getElementById('jobInfo').innerText = 'Scan complete.';
+            } catch (e) {
+                document.getElementById('jobInfo').innerText = 'Error fetching result.';
+            }
         }
 
         function renderReport(report) {
             document.getElementById('reportCard').style.display = 'block';
             const summaryDiv = document.getElementById('summary');
             const detailsDiv = document.getElementById('details');
-            summaryDiv.innerHTML = `<p><strong>Target:</strong> ${report.target || 'N/A'}</p>
-                                    <p><strong>Collected at:</strong> ${report.collected_at || report.finished_at || 'N/A'}</p>`;
+            summaryDiv.innerHTML = `<p><strong>Target:</strong> ${report.target || 'N/A'}</p>`;
 
             const scans = report.scans || {};
             let summaryTable = '<div class="section-title">Scans Overview</div><table><thead><tr><th>Phase</th><th>Note</th></tr></thead><tbody>';

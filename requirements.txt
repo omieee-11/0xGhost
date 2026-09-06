@@ -1,1 +1,6 @@
 Flask>=2.0
+requests
+beautifulsoup4
+urllib3
+python-nmap
+tqdm
