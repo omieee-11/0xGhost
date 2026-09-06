@@ -1,0 +1,54 @@
+name: 0xGhost Automated Scanner Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Target Domain or IP Address'
+        required: true
+        default: 'example.com'
+
+permissions:
+  contents: write
+
+jobs:
+  execute-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set Up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install System Security Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nmap ffuf golang git
+          python -m pip install --upgrade pip
+          pip install requests beautifulsoup4 urllib3 python-nmap tqdm
+
+      - name: Install Go Security Tools
+        run: |
+          go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+          go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
+          go install -v github.com/projectdiscovery/katana/cmd/katana@latest
+          go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+          go install -v github.com/lc/gau/v2/cmd/gau@latest
+          go install -v github.com/tomnomnom/waybackurls@latest
+          echo "/home/runner/go/bin" >> $GITHUB_PATH
+
+      - name: Run Master Scan
+        run: |
+          python3 main.py "${{ github.event.inputs.target }}"
+
+      - name: Save Scan Results to Repository
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add results.json scan_results/ || true
+          git commit -m "Updated scan findings for ${{ github.event.inputs.target }}" || true
+          git push
