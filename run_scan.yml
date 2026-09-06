@@ -1,4 +1,4 @@
-name: Run SPECTRE Backend Engine
+name: Run SPECTRE Backend Scan
 
 on:
   workflow_dispatch:
@@ -11,9 +11,11 @@ on:
 jobs:
   run-scanner:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository Code
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -21,19 +23,19 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install Common Security Tools
+      - name: Install Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y nmap golang-go
+          sudo apt-get install -y nmap
 
-      - name: Run main.py Script
+      - name: Execute main.py
         run: |
           python main.py "${{ github.event.inputs.target }}"
 
-      - name: Commit Generated Results
+      - name: Save & Push Results JSON
         run: |
-          git config --global user.name "spectre-bot"
-          git config --global user.email "bot@spectre.internal"
-          git add .
-          git commit -m "Auto update scan results" || exit 0
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add results_*.json
+          git commit -m "Add scan results for ${{ github.event.inputs.target }}" || exit 0
           git push
