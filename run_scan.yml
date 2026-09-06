@@ -1,0 +1,39 @@
+name: Run SPECTRE Backend Engine
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Target Domain'
+        required: true
+        default: 'example.com'
+
+jobs:
+  run-scanner:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Common Security Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nmap golang-go
+
+      - name: Run main.py Script
+        run: |
+          python main.py "${{ github.event.inputs.target }}"
+
+      - name: Commit Generated Results
+        run: |
+          git config --global user.name "spectre-bot"
+          git config --global user.email "bot@spectre.internal"
+          git add .
+          git commit -m "Auto update scan results" || exit 0
+          git push
