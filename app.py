@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory
 import ipaddress
 import json
+import logging
 import re
 import threading
 import time
@@ -11,6 +12,7 @@ from urllib.parse import urlparse
 from main import run_pipeline
 
 app = Flask(__name__, static_folder='.', static_url_path='')
+logger = logging.getLogger(__name__)
 
 JOBS = {}
 JOBS_LOCK = threading.Lock()
@@ -65,9 +67,11 @@ def _run_job(job_id: str, target: str):
             JOBS[job_id]["result"] = report
             JOBS[job_id]["finished_at"] = time.time()
     except Exception as exc:
+        logger.exception("Scan job %s failed for target %s", job_id, target)
         with JOBS_LOCK:
             JOBS[job_id]["status"] = "error"
-            JOBS[job_id]["error"] = str(exc)
+            JOBS[job_id]["error"] = "scan execution failed"
+            JOBS[job_id]["internal_error"] = str(exc)
             JOBS[job_id]["finished_at"] = time.time()
 
 
