@@ -3,6 +3,11 @@ services:
   0xghost:
     build: .
     container_name: 0xghost
+    environment:
+      - GHOST_HOST=0.0.0.0
+      - GHOST_PORT=8080
+      - GHOST_SCAN_TIMEOUT=1800
+      - GHOST_RESULTS_DIR=/opt/0xGhost/scan_results
     ports:
       - "8080:8080"
     volumes:

@@ -87,9 +87,10 @@ Available endpoints include:
 | Method | Endpoint | Purpose |
 |---|---|---|
 | `GET` | `/` | Serves the dashboard. |
-| `POST` | `/api/scan` | Starts a scan. JSON body: `{ "target": "example.com" }`. |
-| `GET` | `/api/status/<job_id>` | Returns the current job status. |
-| `GET` | `/api/result/<job_id>` | Returns the completed report. |
+| `POST` | `/api/scan` | Starts a background scan. JSON body: `{ "target": "example.com", "profile": "full" }`. |
+| `GET` | `/api/status/<job_id>` | Returns queued/running/done/error/aborted status with phase and terminal progress. |
+| `GET` | `/api/result/<job_id>` | Returns the dashboard-ready report JSON; returns HTTP `202` while running. |
+| `POST` | `/api/abort/<job_id>` | Requests cancellation for a running job. |
 | `GET` | `/api/latest` | Returns the latest root-level `results.json`, when present. |
 
 ## Project architecture
@@ -423,6 +424,15 @@ source .venv/bin/activate
 python3 app.py
 ```
 
+Optional environment variables:
+
+```bash
+export GHOST_HOST=0.0.0.0
+export GHOST_PORT=8080
+export GHOST_SCAN_TIMEOUT=1800
+export GHOST_RESULTS_DIR=scan_results
+```
+
 Open the dashboard at:
 
 ```text
@@ -434,7 +444,7 @@ To start a scan through the API:
 ```bash
 curl -X POST http://127.0.0.1:8080/api/scan \
   -H 'Content-Type: application/json' \
-  -d '{"target":"example.com"}'
+  -d '{"target":"example.com","profile":"full"}'
 ```
 
 The response contains a `job_id`. Poll the status endpoint:
@@ -449,12 +459,18 @@ When the status becomes `done`, retrieve the report:
 curl http://127.0.0.1:8080/api/result/JOB_ID
 ```
 
+Abort a running scan:
+
+```bash
+curl -X POST http://127.0.0.1:8080/api/abort/JOB_ID
+```
+
 ### Dashboard limitations
 
 - Job state is held in memory and disappears when the process restarts.
 - There is no authentication or authorization layer in the Flask app. Do not expose it directly to the public internet.
 - The dashboard is intended for trusted local or private-network use.
-- Review and test the dashboard integration before production use; the current `app.py` calls `run_pipeline` with a `results_dir` keyword while the current `main.py` defines `timeout_per_script` as its second parameter.
+- This API is intentionally for authorized security testing in trusted environments.
 
 ## Running with Docker
 
@@ -469,6 +485,13 @@ Open:
 ```text
 http://127.0.0.1:8080
 ```
+
+The default Compose service runs the dashboard and API in one container and sets:
+
+- `GHOST_HOST=0.0.0.0`
+- `GHOST_PORT=8080`
+- `GHOST_SCAN_TIMEOUT=1800`
+- `GHOST_RESULTS_DIR=/opt/0xGhost/scan_results`
 
 Run the container in the background:
 
@@ -526,6 +549,34 @@ The master report contains fields similar to:
 ```
 
 The `run_log` records each phase's command result, return code, stdout, stderr, and whether it was skipped. The `scans` object contains JSON documents collected from `scan_results/`.
+
+### Dashboard/API report shape (`GET /api/result/<job_id>`)
+
+```json
+{
+  "job_id": "7b58...",
+  "target": "example.com",
+  "profile": "full",
+  "status": "done",
+  "summary": {
+    "phase_total": 5,
+    "phase_done": 3,
+    "phase_error": 1,
+    "phase_missing_tools": 1
+  },
+  "phases": [
+    {
+      "name": "OSINT / subdomains",
+      "status": "done",
+      "missing_tools": []
+    }
+  ],
+  "missing_tools": [],
+  "scans": {}
+}
+```
+
+If a required tool is unavailable, the phase is marked as `missing_tools` and the report contains the missing tool names instead of fabricated findings.
 
 ### Phase reports
 

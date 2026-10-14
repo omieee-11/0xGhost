@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+import os
 import random
 import subprocess
 import sys
@@ -229,7 +230,11 @@ def main():
     target_list = [t.strip() for t in args.targets.split(",") if t.strip()]
 
     manager = ScanManager(concurrency=args.concurrency)
-    output = manager.run_network_scan(target_list, args.profiles)
+    output = manager.run_network_scan(
+        target_list,
+        args.profiles,
+        output_dir=os.getenv("GHOST_SCAN_RESULTS_DIR", "scan_results"),
+    )
     
     print(f"\n[+] Network Scan Completed. Scanned {len(target_list)} targets.")
     print(json.dumps(output, indent=2))

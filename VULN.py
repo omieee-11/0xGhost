@@ -207,7 +207,11 @@ def main():
     target_list = [t.strip() for t in args.targets.split(",") if t.strip()]
 
     manager = VulnerabilityScanManager(concurrency=args.concurrency)
-    output = manager.run_vuln_scan(target_list, args.profiles)
+    output = manager.run_vuln_scan(
+        target_list,
+        args.profiles,
+        output_dir=os.getenv("GHOST_SCAN_RESULTS_DIR", "scan_results"),
+    )
 
     print(f"\n[+] Vulnerability Scan Completed. Processed {len(target_list)} targets.")
     print(json.dumps(output, indent=2))

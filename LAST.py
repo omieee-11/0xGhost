@@ -286,7 +286,12 @@ def main() -> int:
         return 1
 
     manager = DiscoveryScanManager(concurrency=args.concurrency)
-    results = manager.run_batch_scan(target_list, args.profiles, timeout=args.timeout)
+    results = manager.run_batch_scan(
+        target_list,
+        args.profiles,
+        timeout=args.timeout,
+        output_dir=os.getenv("GHOST_SCAN_RESULTS_DIR", "scan_results"),
+    )
 
     print("\n" + "=" * 50)
     print("PHASE 5 DISCOVERY SCAN SUMMARY")

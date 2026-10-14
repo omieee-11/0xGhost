@@ -21,9 +21,10 @@ import json
 import shutil
 import subprocess
 import time
+import threading
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Callable
 
 # Config
 REPO_ROOT = Path(__file__).parent.resolve()
@@ -49,6 +50,13 @@ EXPECTED_TOOLS = [
 ]
 
 PHASE_SCRIPTS = ["OSINT.PY", "NET.py", "VULN.py", "SECURITY.py", "LAST.py"]
+PHASE_LABELS = {
+    "OSINT.PY": "OSINT / subdomains",
+    "NET.py": "Network enumeration",
+    "VULN.py": "Vulnerability checks",
+    "SECURITY.py": "Web/TLS security",
+    "LAST.py": "Content/archive discovery",
+}
 
 
 def is_tool_installed(tool: str) -> bool:
@@ -71,28 +79,73 @@ def check_expected_tools() -> Dict[str, bool]:
     return mapping
 
 
-def run_subprocess(cmd: List[str], timeout: int = DEFAULT_TIMEOUT, input_text: Optional[str] = None) -> Dict[str, Any]:
+def run_subprocess(
+    cmd: List[str],
+    timeout: int = DEFAULT_TIMEOUT,
+    input_text: Optional[str] = None,
+    cancel_event: Optional[threading.Event] = None,
+    env: Optional[Dict[str, str]] = None,
+) -> Dict[str, Any]:
     """Run a subprocess and capture rc/stdout/stderr; never raises on missing binary.
     Returns a dict with rc, stdout, stderr, cmd.
     """
+    start_time = time.time()
+    proc = None
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, input=input_text, timeout=timeout)
-        return {"cmd": cmd, "rc": proc.returncode, "stdout": proc.stdout or "", "stderr": proc.stderr or ""}
+        proc = subprocess.Popen(
+            cmd,
+            cwd=str(REPO_ROOT),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.PIPE if input_text is not None else None,
+            text=True,
+            env=env,
+        )
+        if input_text is not None and proc.stdin is not None:
+            proc.stdin.write(input_text)
+            proc.stdin.close()
+
+        while True:
+            if cancel_event and cancel_event.is_set():
+                proc.terminate()
+                try:
+                    stdout, stderr = proc.communicate(timeout=3)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    stdout, stderr = proc.communicate()
+                return {"cmd": cmd, "rc": None, "stdout": stdout or "", "stderr": "ABORTED"}
+
+            if timeout and (time.time() - start_time) > timeout:
+                proc.kill()
+                stdout, stderr = proc.communicate()
+                return {"cmd": cmd, "rc": None, "stdout": stdout or "", "stderr": "TIMEOUT"}
+
+            try:
+                stdout, stderr = proc.communicate(timeout=1)
+                return {"cmd": cmd, "rc": proc.returncode, "stdout": stdout or "", "stderr": stderr or ""}
+            except subprocess.TimeoutExpired:
+                continue
     except FileNotFoundError as e:
         msg = str(e)
         return {"cmd": cmd, "rc": None, "stdout": "", "stderr": msg}
-    except subprocess.TimeoutExpired as e:
-        return {"cmd": cmd, "rc": None, "stdout": e.stdout or "", "stderr": "TIMEOUT"}
     except Exception as e:
+        if proc is not None:
+            proc.kill()
+            proc.communicate()
         return {"cmd": cmd, "rc": None, "stdout": "", "stderr": str(e)}
 
 
-def run_script(script_name: str, target: str, timeout: int = DEFAULT_TIMEOUT) -> Dict[str, Any]:
+def run_script(
+    script_name: str,
+    target: str,
+    timeout: int = DEFAULT_TIMEOUT,
+    cancel_event: Optional[threading.Event] = None,
+    output_dir: Optional[Path] = None,
+) -> Dict[str, Any]:
     """Execute a phase script and return an execution record.
 
     For OSINT.PY we pass target via stdin (legacy behavior in repo). For others we pass -t <target>.
     """
-    cwd = str(REPO_ROOT)
     print(f"\n==> Running {script_name} against {target}")
 
     if not (REPO_ROOT / script_name).exists():
@@ -102,17 +155,20 @@ def run_script(script_name: str, target: str, timeout: int = DEFAULT_TIMEOUT) ->
 
     if script_name.upper().endswith(".PY"):
         python_bin = shutil.which("python3") or shutil.which("python") or sys.executable
+        env = os.environ.copy()
+        if output_dir:
+            env["GHOST_SCAN_RESULTS_DIR"] = str(output_dir)
         if script_name == "OSINT.PY":
             cmd = [python_bin, script_name]
             # OSINT.PY expects interactive input; feed target via stdin
-            result = run_subprocess(cmd, timeout=timeout, input_text=f"{target}\n")
+            result = run_subprocess(cmd, timeout=timeout, input_text=f"{target}\n", cancel_event=cancel_event, env=env)
         else:
             cmd = [python_bin, script_name, "-t", target]
-            result = run_subprocess(cmd, timeout=timeout)
+            result = run_subprocess(cmd, timeout=timeout, cancel_event=cancel_event, env=env)
     else:
         # Generic executables (should not occur for this repo)
         cmd = ["./" + script_name, target]
-        result = run_subprocess(cmd, timeout=timeout)
+        result = run_subprocess(cmd, timeout=timeout, cancel_event=cancel_event)
 
     # Print brief output to terminal for step-by-step UX
     if result.get("rc") is None:
@@ -134,13 +190,13 @@ def run_script(script_name: str, target: str, timeout: int = DEFAULT_TIMEOUT) ->
     return {"script": script_name, "skipped": False, "rc": result.get("rc"), "stdout": result.get("stdout"), "stderr": result.get("stderr")}
 
 
-def collect_scan_results(target: str) -> Dict[str, Any]:
+def collect_scan_results(scan_results_dir: Path) -> Dict[str, Any]:
     """Collect per-phase JSON outputs from scan_results/ into a dict keyed by filename stem."""
     collected = {}
-    if not SCAN_RESULTS_DIR.exists():
+    if not scan_results_dir.exists():
         return collected
 
-    for json_file in SCAN_RESULTS_DIR.glob("*.json"):
+    for json_file in scan_results_dir.glob("*.json"):
         try:
             with open(json_file, "r") as f:
                 data = json.load(f)
@@ -150,12 +206,22 @@ def collect_scan_results(target: str) -> Dict[str, Any]:
     return collected
 
 
-def run_pipeline(target: str, timeout_per_script: int = DEFAULT_TIMEOUT) -> Dict[str, Any]:
+def run_pipeline(
+    target: str,
+    timeout_per_script: int = DEFAULT_TIMEOUT,
+    phase_scripts: Optional[List[str]] = None,
+    progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    cancel_event: Optional[threading.Event] = None,
+    results_dir: Optional[Path] = None,
+) -> Dict[str, Any]:
     """Main pipeline entrypoint. Returns master report dict."""
     target = target.strip()
     started_at = datetime.utcnow().isoformat() + "Z"
     missing_tools_map = check_expected_tools()
     missing_tools = [t for t, ok in missing_tools_map.items() if not ok]
+    scripts_to_run = phase_scripts or PHASE_SCRIPTS
+    scan_results_dir = Path(results_dir) if results_dir else SCAN_RESULTS_DIR
+    scan_results_dir.mkdir(parents=True, exist_ok=True)
 
     print("\n=== 0xGhost pipeline starting ===")
     print(f"Target: {target}")
@@ -170,14 +236,50 @@ def run_pipeline(target: str, timeout_per_script: int = DEFAULT_TIMEOUT) -> Dict
     run_log: List[Dict[str, Any]] = []
 
     # Run each phase script sequentially
-    for script in PHASE_SCRIPTS:
-        rec = run_script(script, target, timeout=timeout_per_script)
+    for index, script in enumerate(scripts_to_run, start=1):
+        if cancel_event and cancel_event.is_set():
+            run_log.append({"script": script, "skipped": True, "reason": "Aborted by user"})
+            continue
+
+        if progress_callback:
+            progress_callback(
+                {
+                    "event": "phase_started",
+                    "phase_script": script,
+                    "phase_label": PHASE_LABELS.get(script, script),
+                    "phase_index": index,
+                    "phase_total": len(scripts_to_run),
+                }
+            )
+
+        rec = run_script(
+            script,
+            target,
+            timeout=timeout_per_script,
+            cancel_event=cancel_event,
+            output_dir=scan_results_dir,
+        )
         run_log.append(rec)
+        if progress_callback:
+            progress_callback(
+                {
+                    "event": "phase_finished",
+                    "phase_script": script,
+                    "phase_label": PHASE_LABELS.get(script, script),
+                    "phase_index": index,
+                    "phase_total": len(scripts_to_run),
+                    "rc": rec.get("rc"),
+                    "skipped": rec.get("skipped", False),
+                    "stderr": rec.get("stderr", ""),
+                }
+            )
+        if rec.get("stderr") == "ABORTED":
+            break
 
     # Give scripts a moment to write their JSONs
     time.sleep(1)
 
-    collected = collect_scan_results(target)
+    collected = collect_scan_results(scan_results_dir)
 
     finished_at = datetime.utcnow().isoformat() + "Z"
 
@@ -188,6 +290,8 @@ def run_pipeline(target: str, timeout_per_script: int = DEFAULT_TIMEOUT) -> Dict
         "missing_tools": missing_tools,
         "tool_check_details": missing_tools_map,
         "run_log": run_log,
+        "phase_scripts": scripts_to_run,
+        "aborted": any(r.get("stderr") == "ABORTED" for r in run_log),
         "scans": collected,
     }
 
@@ -211,7 +315,10 @@ def run_pipeline(target: str, timeout_per_script: int = DEFAULT_TIMEOUT) -> Dict
             print(f" - {r.get('script')}: SKIPPED ({r.get('reason')})")
         else:
             rc = r.get("rc")
-            status = "OK" if rc == 0 else ("WARN" if rc and rc != 0 else "ERROR")
+            if r.get("stderr") == "ABORTED":
+                status = "ABORTED"
+            else:
+                status = "OK" if rc == 0 else ("WARN" if rc and rc != 0 else "ERROR")
             print(f" - {r.get('script')}: {status} (rc={rc})")
 
     return master_report
