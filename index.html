@@ -1,128 +1,537 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>0xGhost Security Dashboard</title>
+    <title>0xGhost // Red Team Operations & Reconnaissance Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        redteam: {
+                            bg: '#050101',
+                            panel: '#0a0202',
+                            card: '#120404',
+                            border: '#ff1e38',
+                            crimson: '#ff1e38',
+                            bright: '#ff3344',
+                            darkred: '#3d0a0f',
+                            glow: '#ff0022'
+                        }
+                    },
+                    fontFamily: {
+                        mono: ['"JetBrains Mono"', '"Fira Code"', '"Courier New"', 'monospace']
+                    },
+                    boxShadow: {
+                        'neon-red': '0 0 15px rgba(255, 30, 56, 0.4)',
+                        'neon-intense': '0 0 25px rgba(255, 51, 68, 0.6)',
+                        'panel-glow': 'inset 0 0 20px rgba(255, 30, 56, 0.04)'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts for JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root { --bg: #0d1117; --card: #161b22; --accent: #00ff88; --text: #c9d1d9; --border: #30363d; }
-        body { background: var(--bg); color: var(--text); font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin: 0; padding: 20px; }
-        .container { max-width: 1100px; margin: 0 auto; }
-        h1 { color: var(--accent); text-align: center; margin-bottom: 10px; }
-        .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
-        button { background: var(--accent); color: #000; font-weight: bold; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
-        input[type="text"] { width: 60%; padding: 10px; border-radius: 6px; border: 1px solid var(--border); background: #0b0f13; color: var(--text); }
-        .small { font-size: 0.9rem; color: #9aa3ad; }
-        pre { background: #000; padding: 15px; border-radius: 6px; border: 1px solid var(--border); color: #00ff88; overflow-x: auto; }
-        .row { display:flex; gap: 12px; align-items:center; margin-bottom: 12px; }
-        .section-title { color: #9be6b4; margin-top: 8px; margin-bottom: 6px; font-weight: 600; }
-        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-        th, td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); text-align: left; font-family: monospace; }
-        .muted { color: #7a869a; font-size: 0.9rem }
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: #050101;
+            color: #ff3344;
+            overflow-x: hidden;
+        }
+        /* Custom Scrollbar for Red Team Vibe */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0a0202;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3d0a0f;
+            border: 1px solid #ff1e38;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #ff1e38;
+        }
+        .scanline {
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0, 0, 0, 0.4) 50%,
+                rgba(0, 0, 0, 0.4)
+            );
+            background-size: 100% 4px;
+        }
+        @keyframes redPulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 15px rgba(255, 30, 56, 0.4); }
+            50% { opacity: 0.5; box-shadow: 0 0 5px rgba(255, 30, 56, 0.2); }
+        }
+        .animate-red-pulse {
+            animation: redPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
     </style>
 </head>
-<body>
-    <div class="container">
-        <h1>0xGhost Security Suite</h1>
+<body class="min-h-screen scanline relative flex flex-col justify-between selection:bg-red-600 selection:text-white">
 
-        <div class="card">
-            <h3>Start a New Scan</h3>
-            <div class="row">
-                <input type="text" id="targetInput" placeholder="e.g. example.com or 1.2.3.4" />
-                <button id="startBtn" onclick="startScan()">Start Scan</button>
+    <!-- Top Crimson Header -->
+    <header class="border-b border-red-600/40 bg-redteam-panel/90 backdrop-blur-md sticky top-0 z-50 px-4 py-3">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-3 h-3 bg-red-600 rounded-full animate-ping"></div>
+                <h1 class="text-xl sm:text-2xl font-bold tracking-wider text-red-500 drop-shadow-[0_0_10px_rgba(255,30,56,0.8)]">
+                    &gt; 0xGHOST <span class="text-xs text-red-300 font-normal px-2 py-0.5 border border-red-600/50 rounded bg-red-950/40">RED_TEAM_v2.6</span>
+                </h1>
             </div>
-            <div class="small">Enter the target and click Start — scans run inside the container and results will appear below when finished.</div>
-            <div id="jobInfo" class="small" style="margin-top:10px;"></div>
+            <div class="flex items-center space-x-6 text-xs text-red-400/90">
+                <div class="hidden md:flex items-center space-x-2">
+                    <span class="w-2 h-2 rounded-full bg-red-600"></span>
+                    <span>OPSEC: MASKED_ROUTE</span>
+                </div>
+                <div class="flex items-center space-x-2 bg-red-950/50 border border-red-600/40 px-3 py-1 rounded">
+                    <i class="fa-solid fa-skull text-red-500"></i>
+                    <span id="auth-status" class="text-red-300 font-bold">OPERATIONS - READY</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Left Column: Controls & Target Config -->
+        <div class="lg:col-span-1 flex flex-col space-y-6">
+            <!-- Target Input Panel -->
+            <section class="bg-redteam-panel border border-red-600/30 rounded-lg p-5 shadow-panel-glow relative">
+                <div class="absolute -top-3 left-4 bg-redteam-bg px-2 text-xs text-red-400 font-semibold border border-red-600/30 rounded">
+                    // TARGET CONFIGURATION
+                </div>
+                <form id="scan-form" class="space-y-4 mt-2">
+                    <div>
+                        <label class="block text-xs text-red-400/80 mb-1.5 uppercase font-semibold">Target Domain / IP / Subnet</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-red-500 font-bold">&gt;</span>
+                            <input type="text" id="target-input" required placeholder="e.g. target.internal or 10.0.0.1" 
+                                class="w-full bg-redteam-bg border border-red-600/40 rounded px-3 py-2.5 pl-8 text-red-200 placeholder-red-900 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all font-mono text-sm">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs text-red-400/80 mb-1.5 uppercase font-semibold">Engagement Protocol / Profile</label>
+                        <select id="scan-profile" class="w-full bg-redteam-bg border border-red-600/40 rounded px-3 py-2.5 text-red-200 focus:outline-none focus:border-red-500 font-mono text-sm">
+                            <option value="FULL_ATTACK_PIPELINE">Full Attack Pipeline (Phases 1-5)</option>
+                            <option value="AGGRESSIVE_RECON">Aggressive Recon & Subdomains</option>
+                            <option value="DEEP_EXPLOIT_AUDIT">Deep Vulnerability & Exploit Audit</option>
+                            <option value="WEB_BRUTE">Web Content & Directory Brute</option>
+                        </select>
+                    </div>
+
+                    <div class="pt-2 flex items-center space-x-3">
+                        <button type="submit" id="start-btn" 
+                            class="flex-1 bg-red-950 hover:bg-red-900 border border-red-600 hover:border-red-400 text-red-200 hover:text-white font-bold py-3 px-4 rounded transition-all shadow-neon-red hover:shadow-neon-intense flex items-center justify-center space-x-2 text-sm uppercase tracking-wider animate-red-pulse">
+                            <i class="fa-solid fa-crosshairs"></i>
+                            <span>Initialize Attack Pipeline</span>
+                        </button>
+                        <button type="button" id="abort-btn" disabled
+                            class="bg-zinc-950 border border-zinc-800 text-zinc-600 px-4 py-3 rounded font-bold transition-all text-sm uppercase disabled:opacity-40 disabled:cursor-not-allowed">
+                            <i class="fa-solid fa-ban"></i>
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Scan Phases Status Monitor -->
+            <section class="bg-redteam-panel border border-red-600/30 rounded-lg p-5 shadow-panel-glow relative">
+                <div class="absolute -top-3 left-4 bg-redteam-bg px-2 text-xs text-red-400 font-semibold border border-red-600/30 rounded">
+                    // PIPELINE STATUS & PROGRESS
+                </div>
+                <div class="space-y-3 mt-2" id="phases-container">
+                    <!-- Phase 1 -->
+                    <div class="flex items-center justify-between p-2.5 bg-redteam-card border border-red-950 rounded" data-phase="1">
+                        <div class="flex items-center space-x-3">
+                            <span class="text-xs text-red-500 font-bold">[P1]</span>
+                            <span class="text-xs text-red-300">OSINT & Subdomains</span>
+                        </div>
+                        <span class="text-xs px-2 py-0.5 rounded bg-zinc-900 text-zinc-500 border border-zinc-800 phase-badge">IDLE</span>
+                    </div>
+                    <!-- Phase 2 -->
+                    <div class="flex items-center justify-between p-2.5 bg-redteam-card border border-red-950 rounded" data-phase="2">
+                        <div class="flex items-center space-x-3">
+                            <span class="text-xs text-red-500 font-bold">[P2]</span>
+                            <span class="text-xs text-red-300">Nmap Network Enumeration</span>
+                        </div>
+                        <span class="text-xs px-2 py-0.5 rounded bg-zinc-900 text-zinc-500 border border-zinc-800 phase-badge">IDLE</span>
+                    </div>
+                    <!-- Phase 3 -->
+                    <div class="flex items-center justify-between p-2.5 bg-redteam-card border border-red-950 rounded" data-phase="3">
+                        <div class="flex items-center space-x-3">
+                            <span class="text-xs text-red-500 font-bold">[P3]</span>
+                            <span class="text-xs text-red-300">Vulnerabilities (Nuclei/CORS)</span>
+                        </div>
+                        <span class="text-xs px-2 py-0.5 rounded bg-zinc-900 text-zinc-500 border border-zinc-800 phase-badge">IDLE</span>
+                    </div>
+                    <!-- Phase 4 -->
+                    <div class="flex items-center justify-between p-2.5 bg-redteam-card border border-red-950 rounded" data-phase="4">
+                        <div class="flex items-center space-x-3">
+                            <span class="text-xs text-red-500 font-bold">[P4]</span>
+                            <span class="text-xs text-red-300">Web Security & TLS Audits</span>
+                        </div>
+                        <span class="text-xs px-2 py-0.5 rounded bg-zinc-900 text-zinc-500 border border-zinc-800 phase-badge">IDLE</span>
+                    </div>
+                    <!-- Phase 5 -->
+                    <div class="flex items-center justify-between p-2.5 bg-redteam-card border border-red-950 rounded" data-phase="5">
+                        <div class="flex items-center space-x-3">
+                            <span class="text-xs text-red-500 font-bold">[P5]</span>
+                            <span class="text-xs text-red-300">Content & Archive Discovery</span>
+                        </div>
+                        <span class="text-xs px-2 py-0.5 rounded bg-zinc-900 text-zinc-500 border border-zinc-800 phase-badge">IDLE</span>
+                    </div>
+                </div>
+            </section>
         </div>
 
-        <div class="card" id="reportCard" style="display:none;">
-            <h2>Scan Report</h2>
-            <div id="summary"></div>
-            <div id="details"></div>
+        <!-- Right Column: Terminal Logs & Results Viewer -->
+        <div class="lg:col-span-2 flex flex-col space-y-6">
+            <!-- Live Terminal Output -->
+            <section class="bg-redteam-panel border border-red-600/30 rounded-lg p-5 shadow-panel-glow relative flex flex-col h-72">
+                <div class="absolute -top-3 left-4 bg-redteam-bg px-2 text-xs text-red-400 font-semibold border border-red-600/30 rounded flex items-center space-x-2">
+                    <span>// TERMINAL LOG STREAM</span>
+                    <span id="terminal-pulse" class="w-2 h-2 rounded-full bg-red-600 hidden animate-pulse"></span>
+                </div>
+                <div id="terminal-output" class="flex-grow bg-black/90 border border-red-950 rounded p-3 overflow-y-auto text-xs text-red-400 font-mono space-y-1 mt-2">
+                    <div class="text-red-700">[0xGhost Red Team Daemon initialized. Awaiting target acquisition...]</div>
+                    <div class="text-red-700">[Configure target parameters and initialize pipeline to start reconnaissance.]</div>
+                </div>
+                <div class="mt-2 flex items-center justify-between text-xs text-red-500/70">
+                    <span id="job-id-display">JOB_ID: NONE</span>
+                    <button id="clear-terminal" class="hover:text-red-300 underline cursor-pointer">Clear Buffer</button>
+                </div>
+            </section>
+
+            <!-- Results Viewer -->
+            <section class="bg-redteam-panel border border-red-600/30 rounded-lg p-5 shadow-panel-glow relative flex flex-col flex-grow min-h-[380px]">
+                <div class="absolute -top-3 left-4 bg-redteam-bg px-2 text-xs text-red-400 font-semibold border border-red-600/30 rounded flex items-center space-x-4">
+                    <span>// INTELLIGENCE & VULNERABILITY REPORT</span>
+                </div>
+
+                <!-- Tabs Header -->
+                <div class="flex items-center justify-between border-b border-red-950 pb-3 mt-2">
+                    <div class="flex space-x-2">
+                        <button onclick="switchTab('summary')" id="tab-btn-summary" class="px-3 py-1.5 text-xs font-bold rounded bg-red-950 border border-red-600 text-red-200 tab-btn transition-all">
+                            <i class="fa-solid fa-table-cells mr-1"></i> Summary Table
+                        </button>
+                        <button onclick="switchTab('json')" id="tab-btn-json" class="px-3 py-1.5 text-xs font-bold rounded bg-redteam-bg border border-red-950 text-red-500 tab-btn transition-all hover:text-red-300">
+                            <i class="fa-solid fa-code mr-1"></i> Raw JSON Report
+                        </button>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button id="copy-btn" disabled onclick="copyJSON()" class="text-xs bg-red-950/40 border border-red-600/30 text-red-400 hover:bg-red-900/40 px-3 py-1.5 rounded transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                            <i class="fa-solid fa-copy mr-1"></i> Copy JSON
+                        </button>
+                        <button id="export-btn" disabled onclick="exportReport()" class="text-xs bg-red-950/40 border border-red-600/30 text-red-400 hover:bg-red-900/40 px-3 py-1.5 rounded transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                            <i class="fa-solid fa-download mr-1"></i> Download
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tab Content: Summary Table -->
+                <div id="tab-summary" class="tab-content mt-4 flex-grow overflow-x-auto">
+                    <div class="text-center py-16 text-red-950 text-xs">
+                        <i class="fa-solid fa-radar text-3xl mb-2 opacity-40"></i>
+                        <p>No active engagement telemetry recorded. Execute attack pipeline to populate findings.</p>
+                    </div>
+                </div>
+
+                <!-- Tab Content: Raw JSON -->
+                <div id="tab-json" class="tab-content mt-4 flex-grow hidden">
+                    <pre id="json-output" class="bg-black/95 border border-red-950 rounded p-4 text-xs text-red-400 overflow-x-auto h-80 font-mono">{
+  "status": "awaiting_engagement",
+  "target": null,
+  "telemetry": {}
+}</pre>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Custom Modal for Notifications / Alerts -->
+    <div id="custom-modal" class="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-redteam-panel border border-red-600 rounded-lg p-6 max-w-md w-full shadow-neon-red">
+            <h3 id="modal-title" class="text-red-500 font-bold text-base mb-2">// SECURITY ALERT</h3>
+            <p id="modal-message" class="text-xs text-red-300 mb-6 font-mono leading-relaxed"></p>
+            <div class="flex justify-end">
+                <button onclick="closeModal()" class="bg-red-950 border border-red-600 text-red-200 px-4 py-2 rounded text-xs font-bold hover:bg-red-900 uppercase">
+                    Acknowledge
+                </button>
+            </div>
         </div>
     </div>
 
+    <!-- Footer -->
+    <footer class="border-t border-red-600/20 bg-redteam-panel/50 py-3 px-4 text-center text-xs text-red-600/60">
+        0xGhost Red Team Framework &bull; Authorized Penetration Testing Only &bull; All rights reserved.
+    </footer>
+
+    <!-- Frontend Simulation Logic -->
     <script>
-        let pollingHandle = null;
+        let currentJobId = null;
+        let pollInterval = null;
+        let scanActive = false;
 
-        async function startScan() {
-            const target = document.getElementById('targetInput').value.trim();
-            if (!target) { alert('Please enter a target.'); return; }
-            document.getElementById('jobInfo').innerText = 'Starting scan...';
-            document.getElementById('reportCard').style.display = 'none';
-
-            try {
-                const res = await fetch('/api/scan', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({target})
-                });
-                if (!res.ok) {
-                    const err = await res.json();
-                    document.getElementById('jobInfo').innerText = 'Error: ' + (err.error || res.statusText);
-                    return;
-                }
-                const data = await res.json();
-                const jobId = data.job_id;
-                document.getElementById('jobInfo').innerText = `Scan started (job ${jobId}). Polling status...`;
-                pollStatus(jobId);
-            } catch (e) {
-                document.getElementById('jobInfo').innerText = 'Error starting scan.';
-            }
+        function showModal(title, message) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-message').innerText = message;
+            document.getElementById('custom-modal').classList.remove('hidden');
         }
 
-        function pollStatus(jobId) {
-            if (pollingHandle) clearInterval(pollingHandle);
-            pollingHandle = setInterval(async () => {
-                try {
-                    const res = await fetch(`/api/status/${jobId}`);
-                    if (!res.ok) { document.getElementById('jobInfo').innerText = 'Failed to fetch job status.'; clearInterval(pollingHandle); return; }
-                    const s = await res.json();
-                    document.getElementById('jobInfo').innerText = `Job ${jobId} status: ${s.status}`;
-                    if (s.status === 'done') {
-                        clearInterval(pollingHandle);
-                        fetchResult(jobId);
-                    } else if (s.status === 'error') {
-                        clearInterval(pollingHandle);
-                        document.getElementById('jobInfo').innerText = `Job ${jobId} errored.`;
-                    }
-                } catch (e) {
-                    document.getElementById('jobInfo').innerText = 'Error polling status.';
-                    clearInterval(pollingHandle);
+        function closeModal() {
+            document.getElementById('custom-modal').classList.add('hidden');
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.classList.remove('bg-red-950', 'border-red-600', 'text-red-200');
+                el.classList.add('bg-redteam-bg', 'border-red-950', 'text-red-500');
+            });
+
+            document.getElementById('tab-' + tabName).classList.remove('hidden');
+            const activeBtn = document.getElementById('tab-btn-' + tabName);
+            activeBtn.classList.remove('bg-redteam-bg', 'border-red-950', 'text-red-500');
+            activeBtn.classList.add('bg-red-950', 'border-red-600', 'text-red-200');
+        }
+
+        function appendTerminal(text, type = 'info') {
+            const term = document.getElementById('terminal-output');
+            const div = document.createElement('div');
+            let colorClass = 'text-red-400';
+            if (type === 'success') colorClass = 'text-red-200 font-bold';
+            if (type === 'warn') colorClass = 'text-amber-400';
+            if (type === 'error') colorClass = 'text-rose-500 font-bold';
+            
+            div.className = colorClass;
+            div.innerText = `[${new Date().toLocaleTimeString()}] ${text}`;
+            term.appendChild(div);
+            term.scrollTop = term.scrollHeight;
+        }
+
+        document.getElementById('clear-terminal').addEventListener('click', () => {
+            document.getElementById('terminal-output').innerHTML = '<div class="text-red-950">[Terminal buffer cleared.]</div>';
+        });
+
+        // Scan Form Handler
+        document.getElementById('scan-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const target = document.getElementById('target-input').value.trim();
+            const profile = document.getElementById('scan-profile').value;
+
+            if (!target) {
+                showModal('INPUT ERROR', 'Please specify a valid target domain, IP address, or subnet before initializing engagement.');
+                return;
+            }
+
+            startScanSimulation(target, profile);
+        });
+
+        function startScanSimulation(target, profile) {
+            scanActive = true;
+            currentJobId = 'job_red_' + Math.random().toString(36).substring(2, 10);
+            document.getElementById('job-id-display').innerText = `JOB_ID: ${currentJobId}`;
+            document.getElementById('start-btn').disabled = true;
+            document.getElementById('abort-btn').disabled = false;
+            document.getElementById('terminal-pulse').classList.remove('hidden');
+
+            appendTerminal(`Initializing attack pipeline against target: ${target} [Profile: ${profile}]`, 'success');
+            appendTerminal(`Assigned Operation ID: ${currentJobId}`, 'info');
+
+            // Reset phase badges
+            document.querySelectorAll('.phase-badge').forEach(badge => {
+                badge.innerText = 'QUEUED';
+                badge.className = 'text-xs px-2 py-0.5 rounded bg-zinc-900 text-zinc-500 border border-zinc-800 phase-badge';
+            });
+
+            let phase = 1;
+            const phases = [
+                { id: 1, name: 'OSINT & Subdomains' },
+                { id: 2, name: 'Nmap Network Enumeration' },
+                { id: 3, name: 'Vulnerability Scans (Nuclei/CORS)' },
+                { id: 4, name: 'Web Security & TLS Audits' },
+                { id: 5, name: 'Content & Archive Discovery' }
+            ];
+
+            pollInterval = setInterval(() => {
+                if (!scanActive) return;
+
+                if (phase <= 5) {
+                    const currentBadge = document.querySelector(`[data-phase="${phase}"] .phase-badge`);
+                    currentBadge.innerText = 'RUNNING';
+                    currentBadge.className = 'text-xs px-2 py-0.5 rounded bg-red-950 text-red-300 border border-red-700 phase-badge animate-pulse';
+                    
+                    appendTerminal(`[Phase ${phase}] Executing ${phases[phase-1].name}...`, 'info');
+
+                    setTimeout(() => {
+                        if (!scanActive) return;
+                        currentBadge.innerText = 'COMPLETED';
+                        currentBadge.className = 'text-xs px-2 py-0.5 rounded bg-red-950/80 text-red-400 border border-red-800 phase-badge';
+                        appendTerminal(`[Phase ${phase}] Completed successfully. Telemetry indexed.`, 'success');
+                        
+                        if (phase === 5) {
+                            finishScan(target);
+                        }
+                        phase++;
+                    }, 2500);
+
                 }
             }, 3000);
         }
 
-        async function fetchResult(jobId) {
-            document.getElementById('jobInfo').innerText = `Fetching result for job ${jobId}...`;
-            try {
-                const res = await fetch(`/api/result/${jobId}`);
-                if (res.status === 202) { document.getElementById('jobInfo').innerText = 'Result not ready yet.'; return; }
-                if (!res.ok) { const err = await res.json(); document.getElementById('jobInfo').innerText = 'Error: ' + (err.error || res.statusText); return; }
-                const report = await res.json();
-                renderReport(report);
-                document.getElementById('jobInfo').innerText = 'Scan complete.';
-            } catch (e) {
-                document.getElementById('jobInfo').innerText = 'Error fetching result.';
-            }
+        document.getElementById('abort-btn').addEventListener('click', () => {
+            if (!scanActive) return;
+            clearInterval(pollInterval);
+            scanActive = false;
+            document.getElementById('start-btn').disabled = false;
+            document.getElementById('abort-btn').disabled = true;
+            document.getElementById('terminal-pulse').classList.add('hidden');
+            appendTerminal(`[!] Operation job ${currentJobId} aborted by operator.`, 'error');
+            showModal('ENGAGEMENT ABORTED', 'The active red team attack pipeline was forcefully terminated.');
+        });
+
+        function finishScan(target) {
+            clearInterval(pollInterval);
+            scanActive = false;
+            document.getElementById('start-btn').disabled = false;
+            document.getElementById('abort-btn').disabled = true;
+            document.getElementById('terminal-pulse').classList.add('hidden');
+            appendTerminal(`[+] Attack pipeline execution completed successfully for target: ${target}`, 'success');
+
+            const mockResults = {
+                target: target,
+                job_id: currentJobId,
+                started_at: new Date(Date.now() - 15000).toISOString(),
+                finished_at: new Date().toISOString(),
+                missing_tools: [],
+                telemetry: {
+                    osint: { subdomains: [`admin.${target}`, `auth.${target}`, `api.${target}`], live_hosts: 3 },
+                    network: { ports_scanned: 100, open_ports: [21, 22, 80, 443, 8080] },
+                    vulnerabilities: { 
+                        findings: [
+                            { severity: 'HIGH', title: 'Remote Code Execution Vector in Endpoint' },
+                            { severity: 'MEDIUM', title: 'CORS Wildcard Misconfiguration' },
+                            { severity: 'LOW', title: 'Exposed Configuration Backup File' }
+                        ] 
+                    },
+                    security: { headers: { 'Strict-Transport-Security': 'Missing', 'X-Frame-Options': 'Absent' }, ssl_grade: 'B' },
+                    discovery: { endpoints_discovered: 64, historical_urls: 210 }
+                }
+            };
+
+            // Populate JSON tab
+            document.getElementById('json-output').innerText = JSON.stringify(mockResults, null, 2);
+            document.getElementById('copy-btn').disabled = false;
+            document.getElementById('export-btn').disabled = false;
+
+            // Populate Summary Table tab
+            const summaryContainer = document.getElementById('tab-summary');
+            summaryContainer.innerHTML = `
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div class="bg-black/60 border border-red-950 p-3 rounded text-center">
+                            <div class="text-xs text-red-500">Subdomains</div>
+                            <div class="text-lg font-bold text-red-300 mt-1">3 Identified</div>
+                        </div>
+                        <div class="bg-black/60 border border-red-950 p-3 rounded text-center">
+                            <div class="text-xs text-red-500">Open Ports</div>
+                            <div class="text-lg font-bold text-red-200 mt-1">5 Ports</div>
+                        </div>
+                        <div class="bg-black/60 border border-red-950 p-3 rounded text-center">
+                            <div class="text-xs text-red-500">Vulnerabilities</div>
+                            <div class="text-lg font-bold text-rose-500 mt-1">3 Found</div>
+                        </div>
+                        <div class="bg-black/60 border border-red-950 p-3 rounded text-center">
+                            <div class="text-xs text-red-500">SSL Rating</div>
+                            <div class="text-lg font-bold text-amber-400 mt-1">Grade B</div>
+                        </div>
+                    </div>
+                    <div class="border border-red-950 rounded overflow-hidden">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-red-950/70 text-red-300 border-b border-red-900">
+                                <tr>
+                                    <th class="p-3">Phase / Module</th>
+                                    <th class="p-3">Status</th>
+                                    <th class="p-3">Key Finding / Telemetry</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-red-950/40 text-red-200">
+                                <tr>
+                                    <td class="p-3 font-semibold text-red-400">OSINT.PY</td>
+                                    <td class="p-3 text-red-300">SUCCESS</td>
+                                    <td class="p-3">Discovered subdomains: admin, auth, api</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 font-semibold text-red-400">NET.py</td>
+                                    <td class="p-3 text-red-300">SUCCESS</td>
+                                    <td class="p-3">Open ports: 21 (FTP), 22 (SSH), 80, 443, 8080</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 font-semibold text-red-400">VULN.py</td>
+                                    <td class="p-3 text-rose-500 font-bold">HIGH RISK</td>
+                                    <td class="p-3">RCE Vector & CORS wildcard misconfiguration detected</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 font-semibold text-red-400">SECURITY.py</td>
+                                    <td class="p-3 text-amber-400">WARNING</td>
+                                    <td class="p-3">Missing HSTS and X-Frame-Options headers</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 font-semibold text-red-400">LAST.py</td>
+                                    <td class="p-3 text-red-300">SUCCESS</td>
+                                    <td class="p-3">64 endpoints extracted via Katana / Waybackurls</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            showModal('ENGAGEMENT COMPLETE', `Attack pipeline for ${target} concluded successfully. Intelligence report populated.`);
         }
 
-        function renderReport(report) {
-            document.getElementById('reportCard').style.display = 'block';
-            const summaryDiv = document.getElementById('summary');
-            const detailsDiv = document.getElementById('details');
-            summaryDiv.innerHTML = `<p><strong>Target:</strong> ${report.target || 'N/A'}</p>`;
-
-            const scans = report.scans || {};
-            let summaryTable = '<div class="section-title">Scans Overview</div><table><thead><tr><th>Phase</th><th>Note</th></tr></thead><tbody>';
-            for (const [phase, data] of Object.entries(scans)) {
-                const note = (data && data.total_subdomains) ? `subdomains=${data.total_subdomains}` : (data && data.results ? `items=${data.results.length}` : '—');
-                summaryTable += `<tr><td>${phase}</td><td>${note}</td></tr>`;
+        function copyJSON() {
+            const jsonText = document.getElementById('json-output').innerText;
+            // Fallback copy method compatible with iFrames
+            const textarea = document.createElement('textarea');
+            textarea.value = jsonText;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                showModal('COPIED', 'Raw JSON telemetry report successfully copied to clipboard.');
+            } catch (err) {
+                showModal('COPY ERROR', 'Failed to copy to clipboard.');
             }
-            summaryTable += '</tbody></table>';
+            document.body.removeChild(textarea);
+        }
 
-            detailsDiv.innerHTML = `<div class="section-title">Detailed JSON</div><pre>${JSON.stringify(report, null, 2)}</pre>`;
-            summaryDiv.innerHTML += summaryTable;
+        function exportReport() {
+            const jsonText = document.getElementById('json-output').innerText;
+            const blob = new Blob([jsonText], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `0xghost_redteam_report_${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
     </script>
 </body>
