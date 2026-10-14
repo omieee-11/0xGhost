@@ -90,8 +90,8 @@ def api_scan():
 
     try:
         target = normalize_target(raw_target)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+    except ValueError:
+        return jsonify({"error": "target must be a valid domain or IP"}), 400
 
     job_id = uuid.uuid4().hex
     with JOBS_LOCK:
