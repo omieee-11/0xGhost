@@ -5,125 +5,256 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>0xGhost Security Dashboard</title>
     <style>
-        :root { --bg: #0d1117; --card: #161b22; --accent: #00ff88; --text: #c9d1d9; --border: #30363d; }
+        :root { --bg: #0d1117; --card: #161b22; --accent: #00ff88; --text: #c9d1d9; --border: #30363d; --warn: #f59e0b; --err: #f43f5e; }
         body { background: var(--bg); color: var(--text); font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin: 0; padding: 20px; }
-        .container { max-width: 1100px; margin: 0 auto; }
+        .container { max-width: 1200px; margin: 0 auto; }
         h1 { color: var(--accent); text-align: center; margin-bottom: 10px; }
-        .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
-        button { background: var(--accent); color: #000; font-weight: bold; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
-        input[type="text"] { width: 60%; padding: 10px; border-radius: 6px; border: 1px solid var(--border); background: #0b0f13; color: var(--text); }
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+        button { background: var(--accent); color: #000; font-weight: bold; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; }
+        button.secondary { background: #1f2937; color: #d1d5db; border: 1px solid #374151; }
+        button.danger { background: #7f1d1d; color: #fff; }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        input[type="text"], select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid var(--border); background: #0b0f13; color: var(--text); }
         .small { font-size: 0.9rem; color: #9aa3ad; }
-        pre { background: #000; padding: 15px; border-radius: 6px; border: 1px solid var(--border); color: #00ff88; overflow-x: auto; }
-        .row { display:flex; gap: 12px; align-items:center; margin-bottom: 12px; }
-        .section-title { color: #9be6b4; margin-top: 8px; margin-bottom: 6px; font-weight: 600; }
+        pre { background: #000; padding: 12px; border-radius: 6px; border: 1px solid var(--border); color: #00ff88; overflow-x: auto; max-height: 280px; }
+        .row { display:grid; grid-template-columns:2fr 1fr auto auto; gap: 10px; align-items:end; }
+        .section-title { color: #9be6b4; margin: 8px 0 6px 0; font-weight: 600; }
+        .metrics { display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:10px; margin: 10px 0; }
+        .metric { border:1px solid var(--border); border-radius:6px; padding:10px; background:#0b0f13; }
+        .metric .v { font-size:1.2rem; font-weight:700; }
         table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-        th, td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); text-align: left; font-family: monospace; }
-        .muted { color: #7a869a; font-size: 0.9rem }
+        th, td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.06); text-align: left; font-family: monospace; }
+        .badge { display:inline-block; border-radius:999px; padding:3px 8px; font-size:12px; font-weight:700; text-transform:uppercase; }
+        .status-queued,.status-running { background:#1d4ed8; color:#dbeafe; }
+        .status-done { background:#065f46; color:#d1fae5; }
+        .status-error { background:#7f1d1d; color:#fee2e2; }
+        .status-aborted { background:#581c87; color:#f3e8ff; }
+        .status-missing_tools,.status-skipped { background:#78350f; color:#fef3c7; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>0xGhost Security Suite</h1>
+<div class="container">
+    <h1>0xGhost Red Team Dashboard</h1>
 
-        <div class="card">
-            <h3>Start a New Scan</h3>
-            <div class="row">
-                <input type="text" id="targetInput" placeholder="e.g. example.com or 1.2.3.4" />
-                <button id="startBtn" onclick="startScan()">Start Scan</button>
+    <div class="card">
+        <h3>Start Authorized Scan</h3>
+        <div class="row">
+            <div>
+                <label for="targetInput">Target (domain/IP)</label>
+                <input type="text" id="targetInput" placeholder="example.com" />
             </div>
-            <div class="small">Enter the target and click Start — scans run inside the container and results will appear below when finished.</div>
-            <div id="jobInfo" class="small" style="margin-top:10px;"></div>
+            <div>
+                <label for="profileSelect">Profile</label>
+                <select id="profileSelect">
+                    <option value="full">full (all phases)</option>
+                    <option value="recon">recon (OSINT + network)</option>
+                    <option value="vuln">vuln (vuln + web/TLS)</option>
+                    <option value="discovery">discovery (content/archive)</option>
+                </select>
+            </div>
+            <button id="startBtn" onclick="startScan()">Start Scan</button>
+            <button class="danger" id="abortBtn" onclick="abortScan()" disabled>Abort</button>
         </div>
-
-        <div class="card" id="reportCard" style="display:none;">
-            <h2>Scan Report</h2>
-            <div id="summary"></div>
-            <div id="details"></div>
-        </div>
+        <div class="small" style="margin-top:10px;">Use only on systems you own or are explicitly authorized to test.</div>
+        <div id="jobInfo" class="small" style="margin-top:10px;"></div>
     </div>
 
-    <script>
-        let pollingHandle = null;
+    <div class="card" id="statusCard" style="display:none;">
+        <h3>Live Status <span id="statusBadge" class="badge status-queued">queued</span></h3>
+        <div id="phaseInfo" class="small"></div>
+        <div class="section-title">Phases</div>
+        <div id="phaseBadges"></div>
+        <div class="section-title">Terminal</div>
+        <pre id="terminalBox">waiting for output...</pre>
+    </div>
 
-        async function startScan() {
-            const target = document.getElementById('targetInput').value.trim();
-            if (!target) { alert('Please enter a target.'); return; }
-            document.getElementById('jobInfo').innerText = 'Starting scan...';
-            document.getElementById('reportCard').style.display = 'none';
+    <div class="card" id="reportCard" style="display:none;">
+        <h2>Scan Report</h2>
+        <div id="summary"></div>
+        <div class="section-title">Phase Details</div>
+        <div id="details"></div>
+        <div style="margin-top:10px; display:flex; gap:10px;">
+            <button class="secondary" onclick="copyReport()">Copy JSON</button>
+            <button class="secondary" onclick="downloadReport()">Download JSON</button>
+        </div>
+        <div class="section-title">Raw JSON</div>
+        <pre id="rawJson"></pre>
+    </div>
+</div>
 
-            try {
-                const res = await fetch('/api/scan', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({target})
-                });
-                if (!res.ok) {
-                    const err = await res.json();
-                    document.getElementById('jobInfo').innerText = 'Error: ' + (err.error || res.statusText);
-                    return;
-                }
-                const data = await res.json();
-                const jobId = data.job_id;
-                document.getElementById('jobInfo').innerText = `Scan started (job ${jobId}). Polling status...`;
-                pollStatus(jobId);
-            } catch (e) {
-                document.getElementById('jobInfo').innerText = 'Error starting scan.';
+<script>
+let currentJobId = null;
+let pollingHandle = null;
+let latestReport = null;
+
+function statusClass(status) {
+    return `status-${String(status || 'queued').replace(/[^a-z_]/gi, '').toLowerCase()}`;
+}
+
+function setStatus(status) {
+    const badge = document.getElementById('statusBadge');
+    badge.className = `badge ${statusClass(status)}`;
+    badge.innerText = status || 'unknown';
+}
+
+async function startScan() {
+    const target = document.getElementById('targetInput').value.trim();
+    const profile = document.getElementById('profileSelect').value;
+    if (!target) { alert('Please enter a target.'); return; }
+
+    document.getElementById('jobInfo').innerText = 'Starting scan...';
+    document.getElementById('reportCard').style.display = 'none';
+    document.getElementById('statusCard').style.display = 'block';
+    document.getElementById('terminalBox').innerText = 'starting...';
+
+    try {
+        const res = await fetch('/api/scan', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({target, profile})
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            document.getElementById('jobInfo').innerText = 'Error: ' + (data.error || res.statusText);
+            return;
+        }
+
+        currentJobId = data.job_id;
+        setStatus('queued');
+        document.getElementById('abortBtn').disabled = false;
+        document.getElementById('jobInfo').innerText = `Scan started (job ${currentJobId}).`;
+        pollStatus();
+    } catch (e) {
+        document.getElementById('jobInfo').innerText = 'Error starting scan: ' + e.message;
+    }
+}
+
+async function abortScan() {
+    if (!currentJobId) return;
+    try {
+        const res = await fetch(`/api/abort/${currentJobId}`, { method: 'POST' });
+        const data = await res.json();
+        document.getElementById('jobInfo').innerText = data.message || 'Abort requested.';
+        setStatus(data.status || 'aborted');
+    } catch (e) {
+        document.getElementById('jobInfo').innerText = 'Failed to send abort request.';
+    }
+}
+
+function pollStatus() {
+    if (pollingHandle) clearInterval(pollingHandle);
+    pollingHandle = setInterval(async () => {
+        if (!currentJobId) return;
+        try {
+            const res = await fetch(`/api/status/${currentJobId}`);
+            const s = await res.json();
+            if (!res.ok) {
+                document.getElementById('jobInfo').innerText = s.error || 'Failed to fetch status';
+                clearInterval(pollingHandle);
+                return;
             }
-        }
 
-        function pollStatus(jobId) {
-            if (pollingHandle) clearInterval(pollingHandle);
-            pollingHandle = setInterval(async () => {
-                try {
-                    const res = await fetch(`/api/status/${jobId}`);
-                    if (!res.ok) { document.getElementById('jobInfo').innerText = 'Failed to fetch job status.'; clearInterval(pollingHandle); return; }
-                    const s = await res.json();
-                    document.getElementById('jobInfo').innerText = `Job ${jobId} status: ${s.status}`;
-                    if (s.status === 'done') {
-                        clearInterval(pollingHandle);
-                        fetchResult(jobId);
-                    } else if (s.status === 'error') {
-                        clearInterval(pollingHandle);
-                        document.getElementById('jobInfo').innerText = `Job ${jobId} errored.`;
-                    }
-                } catch (e) {
-                    document.getElementById('jobInfo').innerText = 'Error polling status.';
-                    clearInterval(pollingHandle);
-                }
-            }, 3000);
-        }
+            setStatus(s.status);
+            const phase = s.phase || {};
+            document.getElementById('phaseInfo').innerText = phase.name
+                ? `Phase ${phase.index || '?'} / ${phase.total || '?'}: ${phase.name}`
+                : 'Waiting for phase details...';
 
-        async function fetchResult(jobId) {
-            document.getElementById('jobInfo').innerText = `Fetching result for job ${jobId}...`;
-            try {
-                const res = await fetch(`/api/result/${jobId}`);
-                if (res.status === 202) { document.getElementById('jobInfo').innerText = 'Result not ready yet.'; return; }
-                if (!res.ok) { const err = await res.json(); document.getElementById('jobInfo').innerText = 'Error: ' + (err.error || res.statusText); return; }
-                const report = await res.json();
-                renderReport(report);
-                document.getElementById('jobInfo').innerText = 'Scan complete.';
-            } catch (e) {
-                document.getElementById('jobInfo').innerText = 'Error fetching result.';
+            const badges = (s.phase_scripts || []).map((script, idx) => {
+                let status = 'queued';
+                if (phase.script === script && s.status === 'running') status = 'running';
+                if (phase.index && idx + 1 < phase.index) status = s.status === 'aborted' ? 'aborted' : 'done';
+                if (s.status === 'done' && phase.index && idx + 1 <= phase.index) status = 'done';
+                return `<span class="badge ${statusClass(status)}" style="margin-right:6px; margin-bottom:6px;">${script} · ${status}</span>`;
+            }).join('');
+            document.getElementById('phaseBadges').innerHTML = badges || '<span class="small">No phase data</span>';
+
+            document.getElementById('terminalBox').innerText = (s.terminal || []).join('\n') || 'No terminal output yet.';
+
+            if (['done', 'error', 'aborted'].includes(String(s.status))) {
+                clearInterval(pollingHandle);
+                document.getElementById('abortBtn').disabled = true;
+                await fetchResult();
             }
+        } catch (e) {
+            document.getElementById('jobInfo').innerText = 'Error polling status: ' + e.message;
+            clearInterval(pollingHandle);
+        }
+    }, 2000);
+}
+
+async function fetchResult() {
+    if (!currentJobId) return;
+    try {
+        const res = await fetch(`/api/result/${currentJobId}`);
+        const data = await res.json();
+        if (res.status === 202) {
+            document.getElementById('jobInfo').innerText = 'Result still processing...';
+            return;
+        }
+        if (!res.ok) {
+            document.getElementById('jobInfo').innerText = data.error || 'Failed to fetch result';
+            return;
         }
 
-        function renderReport(report) {
-            document.getElementById('reportCard').style.display = 'block';
-            const summaryDiv = document.getElementById('summary');
-            const detailsDiv = document.getElementById('details');
-            summaryDiv.innerHTML = `<p><strong>Target:</strong> ${report.target || 'N/A'}</p>`;
+        latestReport = data;
+        renderReport(data);
+        document.getElementById('jobInfo').innerText = `Scan ${data.status || 'done'}.`;
+    } catch (e) {
+        document.getElementById('jobInfo').innerText = 'Error fetching result: ' + e.message;
+    }
+}
 
-            const scans = report.scans || {};
-            let summaryTable = '<div class="section-title">Scans Overview</div><table><thead><tr><th>Phase</th><th>Note</th></tr></thead><tbody>';
-            for (const [phase, data] of Object.entries(scans)) {
-                const note = (data && data.total_subdomains) ? `subdomains=${data.total_subdomains}` : (data && data.results ? `items=${data.results.length}` : '—');
-                summaryTable += `<tr><td>${phase}</td><td>${note}</td></tr>`;
-            }
-            summaryTable += '</tbody></table>';
+function renderReport(report) {
+    document.getElementById('reportCard').style.display = 'block';
 
-            detailsDiv.innerHTML = `<div class="section-title">Detailed JSON</div><pre>${JSON.stringify(report, null, 2)}</pre>`;
-            summaryDiv.innerHTML += summaryTable;
-        }
-    </script>
+    const summary = report.summary || {};
+    const metrics = `
+        <div class="metrics">
+            <div class="metric"><div>Target</div><div class="v">${report.target || 'N/A'}</div></div>
+            <div class="metric"><div>Profile</div><div class="v">${report.profile || 'N/A'}</div></div>
+            <div class="metric"><div>Phases</div><div class="v">${summary.phase_done || 0}/${summary.phase_total || 0}</div></div>
+            <div class="metric"><div>Errors</div><div class="v">${summary.phase_error || 0}</div></div>
+            <div class="metric"><div>Missing Tools</div><div class="v">${summary.phase_missing_tools || 0}</div></div>
+            <div class="metric"><div>Aborted</div><div class="v">${summary.phase_aborted || 0}</div></div>
+        </div>`;
+
+    document.getElementById('summary').innerHTML = metrics;
+
+    const rows = (report.phases || []).map(p => `
+        <tr>
+            <td>${p.phase_index || ''}</td>
+            <td>${p.name || p.script}</td>
+            <td><span class="badge ${statusClass(p.status)}">${p.status}</span></td>
+            <td>${(p.missing_tools || []).join(', ') || '—'}</td>
+        </tr>
+    `).join('');
+
+    document.getElementById('details').innerHTML = `
+        <table>
+            <thead><tr><th>#</th><th>Phase</th><th>Status</th><th>Missing tools</th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="4">No phase details</td></tr>'}</tbody>
+        </table>`;
+
+    document.getElementById('rawJson').innerText = JSON.stringify(report, null, 2);
+}
+
+async function copyReport() {
+    if (!latestReport) return;
+    await navigator.clipboard.writeText(JSON.stringify(latestReport, null, 2));
+}
+
+function downloadReport() {
+    if (!latestReport) return;
+    const blob = new Blob([JSON.stringify(latestReport, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `0xghost-report-${currentJobId || 'scan'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+</script>
 </body>
 </html>

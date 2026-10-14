@@ -10,6 +10,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Set GOPATH and PATH
 ENV GOPATH=/root/go
 ENV PATH=$PATH:/root/go/bin
+ENV GHOST_HOST=0.0.0.0
+ENV GHOST_PORT=8080
+ENV GHOST_SCAN_TIMEOUT=1800
+ENV GHOST_RESULTS_DIR=/opt/0xGhost/scan_results
 
 # Copy repo files
 WORKDIR /opt/0xGhost

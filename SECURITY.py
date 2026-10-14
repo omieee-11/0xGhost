@@ -220,7 +220,11 @@ def main():
     target_list = [t.strip() for t in args.targets.split(",") if t.strip()]
 
     manager = SecurityScanManager(concurrency=args.concurrency)
-    output = manager.run_batch_scan(target_list, args.profiles)
+    output = manager.run_batch_scan(
+        target_list,
+        args.profiles,
+        output_dir=os.getenv("GHOST_SCAN_RESULTS_DIR", "scan_results"),
+    )
 
     print(f"\n[+] Phase 4 Scan Complete. Handled {len(target_list)} targets.")
     print(json.dumps(output, indent=2))

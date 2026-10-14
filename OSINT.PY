@@ -2,6 +2,7 @@ import subprocess
 import sys
 import time
 import json
+import os
 import urllib.request
 from pathlib import Path
 
@@ -158,6 +159,6 @@ def run_osint_scan(target, output_dir="scan_results"):
 if __name__ == "__main__":
     target_input = input("Enter Target IP/Domain: ").strip()
     if target_input:
-        run_osint_scan(target_input)
+        run_osint_scan(target_input, output_dir=os.getenv("GHOST_SCAN_RESULTS_DIR", "scan_results"))
     else:
         print("[-] No target specified.")
