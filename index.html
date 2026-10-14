@@ -1,129 +1,458 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>0xGhost Security Dashboard</title>
-    <style>
-        :root { --bg: #0d1117; --card: #161b22; --accent: #00ff88; --text: #c9d1d9; --border: #30363d; }
-        body { background: var(--bg); color: var(--text); font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin: 0; padding: 20px; }
-        .container { max-width: 1100px; margin: 0 auto; }
-        h1 { color: var(--accent); text-align: center; margin-bottom: 10px; }
-        .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
-        button { background: var(--accent); color: #000; font-weight: bold; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
-        input[type="text"] { width: 60%; padding: 10px; border-radius: 6px; border: 1px solid var(--border); background: #0b0f13; color: var(--text); }
-        .small { font-size: 0.9rem; color: #9aa3ad; }
-        pre { background: #000; padding: 15px; border-radius: 6px; border: 1px solid var(--border); color: #00ff88; overflow-x: auto; }
-        .row { display:flex; gap: 12px; align-items:center; margin-bottom: 12px; }
-        .section-title { color: #9be6b4; margin-top: 8px; margin-bottom: 6px; font-weight: 600; }
-        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-        th, td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); text-align: left; font-family: monospace; }
-        .muted { color: #7a869a; font-size: 0.9rem }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>0xGhost // Docker Ops Console</title>
+  <style>
+    :root {
+      --bg: #050708;
+      --panel: #0b0f11;
+      --panel-2: #0f1518;
+      --line: #1f2b2e;
+      --neon: #00ffa3;
+      --neon-2: #24d3ff;
+      --warn: #ffbf47;
+      --err: #ff5f7a;
+      --ok: #00ffa3;
+      --text: #c8ffe8;
+      --muted: #79b09a;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 10% 20%, rgba(0, 255, 163, 0.08), transparent 30%),
+        radial-gradient(circle at 90% 10%, rgba(36, 211, 255, 0.09), transparent 25%),
+        linear-gradient(180deg, #040506, #070b0d 60%, #040607);
+      padding: 24px;
+    }
+
+    .grid-overlay::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image: linear-gradient(rgba(30, 60, 48, 0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(30, 60, 48, 0.2) 1px, transparent 1px);
+      background-size: 24px 24px;
+      opacity: 0.18;
+      z-index: 0;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(8, 13, 15, 0.95), rgba(7, 11, 13, 0.95));
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 0 0 1px rgba(0, 255, 163, 0.08), 0 0 28px rgba(0, 255, 163, 0.08);
+      padding: 20px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.4rem, 3vw, 2.1rem);
+      color: var(--neon);
+      text-shadow: 0 0 10px rgba(0, 255, 163, 0.45);
+    }
+
+    .subtitle {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .scan-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      background: #040809;
+      color: var(--text);
+      border: 1px solid #22443b;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 0.95rem;
+      outline: none;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--neon);
+      box-shadow: 0 0 0 2px rgba(0, 255, 163, 0.2);
+    }
+
+    button {
+      border: 1px solid #22c98a;
+      color: #022417;
+      background: linear-gradient(180deg, #00ffa3, #00d789);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.03em;
+    }
+
+    button[disabled] { opacity: 0.6; cursor: not-allowed; }
+
+    .status-box {
+      margin-top: 12px;
+      padding: 10px 12px;
+      background: #05090b;
+      border: 1px solid #1b3130;
+      border-radius: 10px;
+      color: var(--muted);
+      min-height: 40px;
+      font-size: 0.9rem;
+      word-break: break-word;
+    }
+
+    .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .badge {
+      border: 1px solid #24423c;
+      background: #091212;
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      margin: 10px 0 16px;
+    }
+
+    .metric {
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+    }
+
+    .metric .label { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; }
+    .metric .value { margin-top: 4px; color: var(--neon); font-size: 1rem; font-weight: 700; }
+
+    .section-title {
+      margin: 16px 0 10px;
+      color: var(--neon-2);
+      font-weight: 700;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+      background: #060a0b;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 9px 10px;
+      border-bottom: 1px solid #11201e;
+      vertical-align: top;
+      word-break: break-word;
+    }
+
+    th { color: #93f7cd; background: #0a1215; font-weight: 700; }
+
+    .status-ok { color: var(--ok); }
+    .status-warn { color: var(--warn); }
+    .status-err { color: var(--err); }
+
+    details {
+      border: 1px solid #1a2d2c;
+      background: #060c0d;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      padding: 8px 10px;
+    }
+
+    summary { cursor: pointer; color: #8be7ff; font-weight: 700; }
+
+    pre {
+      margin: 10px 0 0;
+      padding: 10px;
+      border-radius: 8px;
+      background: #030506;
+      border: 1px solid #142322;
+      overflow: auto;
+      color: #8fffd0;
+      font-size: 0.78rem;
+      max-height: 320px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .hidden { display: none; }
+  </style>
 </head>
-<body>
-    <div class="container">
-        <h1>0xGhost Security Suite</h1>
-
-        <div class="card">
-            <h3>Start a New Scan</h3>
-            <div class="row">
-                <input type="text" id="targetInput" placeholder="e.g. example.com or 1.2.3.4" />
-                <button id="startBtn" onclick="startScan()">Start Scan</button>
-            </div>
-            <div class="small">Enter the target and click Start — scans run inside the container and results will appear below when finished.</div>
-            <div id="jobInfo" class="small" style="margin-top:10px;"></div>
-        </div>
-
-        <div class="card" id="reportCard" style="display:none;">
-            <h2>Scan Report</h2>
-            <div id="summary"></div>
-            <div id="details"></div>
-        </div>
+<body class="grid-overlay">
+  <div class="container">
+    <div class="panel">
+      <h1>0xGhost // Docker Hacker Console</h1>
+      <div class="subtitle">Enter a website/domain, run the scan, and review a fully structured report.</div>
+      <div class="scan-row">
+        <input id="targetInput" type="text" placeholder="example.com" autocomplete="off" required />
+        <button id="startBtn" onclick="startScan()">RUN SCAN</button>
+      </div>
+      <div class="badges">
+        <span class="badge">Container: ACTIVE</span>
+        <span class="badge">Pipeline: OSINT → NET → VULN → SECURITY → DISCOVERY</span>
+      </div>
+      <div id="jobInfo" class="status-box">Awaiting target input…</div>
     </div>
 
-    <script>
-        let pollingHandle = null;
+    <div id="reportPanel" class="panel hidden">
+      <div class="section-title">Mission Summary</div>
+      <div id="metrics" class="metric-grid"></div>
 
-        async function startScan() {
-            const target = document.getElementById('targetInput').value.trim();
-            if (!target) { alert('Please enter a target.'); return; }
-            document.getElementById('jobInfo').innerText = 'Starting scan...';
-            document.getElementById('reportCard').style.display = 'none';
+      <div class="section-title">Pipeline Execution</div>
+      <div id="runTable"></div>
 
-            try {
-                const res = await fetch('/api/scan', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({target})
-                });
-                if (!res.ok) {
-                    const err = await res.json();
-                    document.getElementById('jobInfo').innerText = 'Error: ' + (err.error || res.statusText);
-                    return;
-                }
-                const data = await res.json();
-                const jobId = data.job_id;
-                document.getElementById('jobInfo').innerText = `Scan started (job ${jobId}). Polling status...`;
-                pollStatus(jobId);
-            } catch (e) {
-                document.getElementById('jobInfo').innerText = 'Error starting scan.';
-            }
+      <div class="section-title">Tool Availability</div>
+      <div id="tools"></div>
+
+      <div class="section-title">Detailed Findings</div>
+      <div id="findings"></div>
+
+      <div class="section-title">Raw JSON</div>
+      <pre id="rawJson"></pre>
+    </div>
+  </div>
+
+  <script>
+    let pollTimer = null;
+
+    const byId = (id) => document.getElementById(id);
+
+    function fmtTime(ts) {
+      if (!ts) return "N/A";
+      const ms = typeof ts === "number" ? ts * 1000 : Date.parse(ts);
+      if (Number.isNaN(ms)) return String(ts);
+      return new Date(ms).toLocaleString();
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function setStatus(message, tone = "warn") {
+      const el = byId("jobInfo");
+      el.className = "status-box";
+      if (tone === "ok") el.classList.add("status-ok");
+      if (tone === "err") el.classList.add("status-err");
+      el.textContent = message;
+    }
+
+    async function startScan() {
+      const input = byId("targetInput");
+      const target = input.value.trim();
+      if (!target) {
+        setStatus("Target is required. Enter a valid domain or IP.", "err");
+        input.focus();
+        return;
+      }
+
+      byId("startBtn").disabled = true;
+      byId("reportPanel").classList.add("hidden");
+      setStatus("Initializing scan pipeline...", "warn");
+
+      try {
+        const res = await fetch("/api/scan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ target })
+        });
+        const payload = await res.json();
+
+        if (!res.ok) {
+          setStatus(`Start failed: ${payload.error || res.statusText}`, "err");
+          return;
         }
 
-        function pollStatus(jobId) {
-            if (pollingHandle) clearInterval(pollingHandle);
-            pollingHandle = setInterval(async () => {
-                try {
-                    const res = await fetch(`/api/status/${jobId}`);
-                    if (!res.ok) { document.getElementById('jobInfo').innerText = 'Failed to fetch job status.'; clearInterval(pollingHandle); return; }
-                    const s = await res.json();
-                    document.getElementById('jobInfo').innerText = `Job ${jobId} status: ${s.status}`;
-                    if (s.status === 'done') {
-                        clearInterval(pollingHandle);
-                        fetchResult(jobId);
-                    } else if (s.status === 'error') {
-                        clearInterval(pollingHandle);
-                        document.getElementById('jobInfo').innerText = `Job ${jobId} errored.`;
-                    }
-                } catch (e) {
-                    document.getElementById('jobInfo').innerText = 'Error polling status.';
-                    clearInterval(pollingHandle);
-                }
-            }, 3000);
+        setStatus(`Scan queued for ${payload.target}. Tracking job ${payload.job_id}...`, "ok");
+        watchStatus(payload.job_id);
+      } catch (err) {
+        setStatus(`Network error while starting scan: ${err.message}`, "err");
+      } finally {
+        byId("startBtn").disabled = false;
+      }
+    }
+
+    function watchStatus(jobId) {
+      if (pollTimer) clearInterval(pollTimer);
+
+      pollTimer = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/status/${jobId}`);
+          const payload = await res.json();
+
+          if (!res.ok) {
+            clearInterval(pollTimer);
+            setStatus(`Status error: ${payload.error || res.statusText}`, "err");
+            return;
+          }
+
+          const status = payload.status || "unknown";
+          const tone = status === "done" ? "ok" : status === "error" ? "err" : "warn";
+          setStatus(`Job ${jobId} :: ${status.toUpperCase()} | target=${payload.target} | started=${fmtTime(payload.started_at)}`, tone);
+
+          if (status === "done" || status === "error") {
+            clearInterval(pollTimer);
+            await fetchResult(jobId);
+          }
+        } catch (err) {
+          clearInterval(pollTimer);
+          setStatus(`Polling failed: ${err.message}`, "err");
+        }
+      }, 2500);
+    }
+
+    async function fetchResult(jobId) {
+      try {
+        const res = await fetch(`/api/result/${jobId}`);
+        const payload = await res.json();
+
+        if (res.status === 202) {
+          setStatus("Scan result is not ready yet.", "warn");
+          return;
         }
 
-        async function fetchResult(jobId) {
-            document.getElementById('jobInfo').innerText = `Fetching result for job ${jobId}...`;
-            try {
-                const res = await fetch(`/api/result/${jobId}`);
-                if (res.status === 202) { document.getElementById('jobInfo').innerText = 'Result not ready yet.'; return; }
-                if (!res.ok) { const err = await res.json(); document.getElementById('jobInfo').innerText = 'Error: ' + (err.error || res.statusText); return; }
-                const report = await res.json();
-                renderReport(report);
-                document.getElementById('jobInfo').innerText = 'Scan complete.';
-            } catch (e) {
-                document.getElementById('jobInfo').innerText = 'Error fetching result.';
-            }
+        if (!res.ok) {
+          setStatus(`Result error: ${payload.error || res.statusText}`, "err");
+          return;
         }
 
-        function renderReport(report) {
-            document.getElementById('reportCard').style.display = 'block';
-            const summaryDiv = document.getElementById('summary');
-            const detailsDiv = document.getElementById('details');
-            summaryDiv.innerHTML = `<p><strong>Target:</strong> ${report.target || 'N/A'}</p>`;
-
-            const scans = report.scans || {};
-            let summaryTable = '<div class="section-title">Scans Overview</div><table><thead><tr><th>Phase</th><th>Note</th></tr></thead><tbody>';
-            for (const [phase, data] of Object.entries(scans)) {
-                const note = (data && data.total_subdomains) ? `subdomains=${data.total_subdomains}` : (data && data.results ? `items=${data.results.length}` : '—');
-                summaryTable += `<tr><td>${phase}</td><td>${note}</td></tr>`;
-            }
-            summaryTable += '</tbody></table>';
-
-            detailsDiv.innerHTML = `<div class="section-title">Detailed JSON</div><pre>${JSON.stringify(report, null, 2)}</pre>`;
-            summaryDiv.innerHTML += summaryTable;
+        if (payload.status === "error") {
+          setStatus(`Scan failed: ${payload.error || "Unknown error"}`, "err");
+          byId("rawJson").textContent = JSON.stringify(payload, null, 2);
+          byId("reportPanel").classList.remove("hidden");
+          return;
         }
-    </script>
+
+        renderReport(payload);
+        setStatus("Scan completed successfully.", "ok");
+      } catch (err) {
+        setStatus(`Result fetch failed: ${err.message}`, "err");
+      }
+    }
+
+    function renderMetrics(report) {
+      const scans = report.scans || {};
+      const runLog = Array.isArray(report.run_log) ? report.run_log : [];
+      const failed = runLog.filter((x) => x.skipped || (x.rc !== 0 && x.rc !== null)).length;
+      const missingTools = Array.isArray(report.missing_tools) ? report.missing_tools.length : 0;
+
+      byId("metrics").innerHTML = `
+        <div class="metric"><div class="label">Target</div><div class="value">${escapeHtml(report.target || "N/A")}</div></div>
+        <div class="metric"><div class="label">Started</div><div class="value">${escapeHtml(fmtTime(report.started_at))}</div></div>
+        <div class="metric"><div class="label">Finished</div><div class="value">${escapeHtml(fmtTime(report.finished_at))}</div></div>
+        <div class="metric"><div class="label">Phases Logged</div><div class="value">${runLog.length}</div></div>
+        <div class="metric"><div class="label">Failures/Warnings</div><div class="value">${failed}</div></div>
+        <div class="metric"><div class="label">Scan JSON Artifacts</div><div class="value">${Object.keys(scans).length}</div></div>
+        <div class="metric"><div class="label">Missing Tools</div><div class="value">${missingTools}</div></div>
+      `;
+    }
+
+    function renderRunTable(report) {
+      const rows = Array.isArray(report.run_log) ? report.run_log : [];
+      if (!rows.length) {
+        byId("runTable").innerHTML = "<div class='status-box'>No run log available.</div>";
+        return;
+      }
+
+      let html = "<table><thead><tr><th>Phase Script</th><th>Status</th><th>Code</th><th>Notes</th></tr></thead><tbody>";
+      for (const row of rows) {
+        const skipped = !!row.skipped;
+        const rc = row.rc;
+        const status = skipped ? "SKIPPED" : rc === 0 ? "OK" : rc === null ? "ERROR" : "WARN";
+        const toneClass = status === "OK" ? "status-ok" : status === "WARN" ? "status-warn" : "status-err";
+        const notes = skipped ? (row.reason || "Skipped") : (row.stderr ? row.stderr.slice(0, 180) : "Executed");
+
+        html += `<tr>
+          <td>${escapeHtml(row.script || "N/A")}</td>
+          <td class='${toneClass}'>${status}</td>
+          <td>${escapeHtml(rc === null || rc === undefined ? "N/A" : rc)}</td>
+          <td>${escapeHtml(notes)}</td>
+        </tr>`;
+      }
+      html += "</tbody></table>";
+      byId("runTable").innerHTML = html;
+    }
+
+    function renderTools(report) {
+      const checks = report.tool_check_details || {};
+      const keys = Object.keys(checks);
+      if (!keys.length) {
+        byId("tools").innerHTML = "<div class='status-box'>No tool inventory available.</div>";
+        return;
+      }
+
+      let html = "<table><thead><tr><th>Tool</th><th>Available</th></tr></thead><tbody>";
+      for (const tool of keys.sort()) {
+        const ok = !!checks[tool];
+        html += `<tr><td>${escapeHtml(tool)}</td><td class='${ok ? "status-ok" : "status-err"}'>${ok ? "YES" : "NO"}</td></tr>`;
+      }
+      html += "</tbody></table>";
+      byId("tools").innerHTML = html;
+    }
+
+    function renderFindings(report) {
+      const scans = report.scans || {};
+      const keys = Object.keys(scans).sort();
+      if (!keys.length) {
+        byId("findings").innerHTML = "<div class='status-box'>No detailed scan data found.</div>";
+        return;
+      }
+
+      let html = "";
+      for (const key of keys) {
+        const data = scans[key];
+        const resultCount = Array.isArray(data?.results) ? data.results.length : (Array.isArray(data?.findings) ? data.findings.length : "N/A");
+        html += `
+          <details>
+            <summary>${escapeHtml(key)} :: records=${escapeHtml(resultCount)}</summary>
+            <pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>
+          </details>
+        `;
+      }
+      byId("findings").innerHTML = html;
+    }
+
+    function renderReport(report) {
+      renderMetrics(report);
+      renderRunTable(report);
+      renderTools(report);
+      renderFindings(report);
+      byId("rawJson").textContent = JSON.stringify(report, null, 2);
+      byId("reportPanel").classList.remove("hidden");
+    }
+  </script>
 </body>
 </html>

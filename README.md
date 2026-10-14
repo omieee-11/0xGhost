@@ -158,7 +158,7 @@ The Flask service. It maintains an in-memory `JOBS` dictionary, starts scans in 
 
 ### `index.html`
 
-A self-contained dark-themed dashboard. It submits targets to `/api/scan`, polls `/api/status/<job_id>` every three seconds, and renders the returned report as a summary table plus formatted JSON.
+A self-contained hacker-style dashboard designed for Docker-first usage. It requires a target input, starts scans from a single run button, polls `/api/status/<job_id>`, and renders structured sections for summary metrics, per-phase execution, tool availability, detailed findings, and raw JSON output.
 
 ### `OSINT.PY`
 
@@ -201,7 +201,7 @@ The script uses `sudo`, `apt`, and `dpkg`, so it is intended for Debian-based sy
 
 ### `Dockerfile` and `docker-compose.yml`
 
-The Docker image is based on `kalilinux/kali-rolling`. It installs Python, Nmap, FFUF, Go, and several ProjectDiscovery/archive tools. Docker Compose maps port `8080` and mounts the repository into `/opt/0xGhost` so generated results remain available on the host.
+The Docker image is based on `kalilinux/kali-rolling`. It installs Python plus the expected scanner toolchain used by the pipeline, including Nmap, FFUF, Amass, SQLMap, testssl.sh, CORStest, Subfinder, HTTPX, Katana, Nuclei, Gau, Waybackurls, and Subzy. Docker Compose maps port `8080` and mounts the repository into `/opt/0xGhost` so generated results remain available on the host.
 
 ### `run_scan.yml`
 
